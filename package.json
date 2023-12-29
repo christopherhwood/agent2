@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "lint": "eslint .",
     "test": "jest"
   },
   "repository": {
@@ -11,5 +12,10 @@
     "url": "github.com/christopherhwood/agent2"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "eslint": "^8.56.0",
+    "koa": "^2.15.0",
+    "openai": "^4.24.1"
+  }
 }
