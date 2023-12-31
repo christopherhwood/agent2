@@ -3,7 +3,8 @@ const Koa = require('koa');
 const Router = require('@koa/router');
 const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer } = require('./dockerOperations');
-const { setupDockerDirectory, ensureGitSuffix } = require('./utils');
+const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
+const { getInitialContext } = require('./repoAnalysis');
 
 setupDockerDirectory();
 
@@ -55,6 +56,40 @@ router.post('/clone-repo', async (ctx) => {
     ctx.body = { error: 'Request must be in JSON format' };
   }
 });
+
+router.post('/analyze-repo', async (ctx) => {
+  const { taskDescription, gitRepoUrl } = ctx.request.body;
+
+  // Initialize data structures for tracking key files and commits
+  let keyFiles = [];
+  let keyCommits = [];
+
+  const repoName = extractRepoName(gitRepoUrl);
+
+  // 1. Get directory tree & recent commits
+  const context = await getInitialContext(repoName); // Implement this
+  console.log(context);
+
+  //   // 2. & 3. Get and fetch investigation suggestions
+  //   const investigationQuery = prepareInvestigationQuery(taskDescription, context); // Implement this
+  //   const investigationSuggestions = await queryGpt4WithJsonCheck(investigationQuery);
+  //   const { investigationData, files, commits } = await fetchInvestigationData(investigationSuggestions, gitRepoUrl); // Implement this
+
+  //   // Update tracking lists
+  //   keyFiles.push(...files);
+  //   keyCommits.push(...commits);
+
+  //   // 4. & 5. Initial and iterative confirmation
+  //   const confirmationResponse = await queryGptWithConfirmation(investigationData);
+
+  //   // 6. & 7. Send deep dive context for summary and confirm summary
+  //   const summaryQuery = prepareSummaryQuery(taskDescription, confirmationResponse, keyFiles, keyCommits); // Implement this
+  //   const finalSummary = await queryGptWithConfirmation(summaryQuery);
+
+//   // 8. Return finalized summary and tracked items to the user
+//   ctx.body = { summary: finalSummary, keyFiles, keyCommits };
+});
+
 
 router.prefix('/api');
 

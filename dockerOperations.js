@@ -1,6 +1,7 @@
 const Docker = require('dockerode');
 const fs = require('fs');
 const os = require('os');
+const { extractRepoName } = require('./utils');
 const docker = new Docker();
 
 const hostRepoPath = '/var/qckfx/repos';
@@ -56,17 +57,6 @@ async function cloneRepositoryInContainer(gitRepoUrl, userToken) {
       await container.remove();
     }
   }
-}
-
-function extractRepoName(gitRepoUrl) {
-  // Assuming the URL ends with '.git'
-  const parts = gitRepoUrl.split('/');
-  let repoName = parts.pop(); // gets 'repo.git'
-
-  // Remove '.git' if present
-  repoName = repoName.replace('.git', '');
-    
-  return repoName;
 }
 
 module.exports = {

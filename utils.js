@@ -34,5 +34,16 @@ function ensureGitSuffix(url) {
   return url;
 }
 
-module.exports = { setupDockerDirectory, ensureGitSuffix };
+function extractRepoName(gitRepoUrl) {
+  // Assuming the URL ends with '.git'
+  const parts = gitRepoUrl.split('/');
+  let repoName = parts.pop(); // gets 'repo.git'
+  
+  // Remove '.git' if present
+  repoName = repoName.replace('.git', '');
+      
+  return repoName;
+}
+
+module.exports = { setupDockerDirectory, ensureGitSuffix, extractRepoName };
 
