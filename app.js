@@ -6,7 +6,7 @@ const { cloneRepositoryInContainer } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
 const { getInitialContext, fetchInvestigationData } = require('./repoAnalysis');
 const { prepareInvestigationQuery } = require('./llmQueries');
-const { queryLlmWithJsonCheck } = require('./llmService');
+const { queryLlmWithJsonCheck, confirmInvestigationDataWithLlm } = require('./llmService');
 
 setupDockerDirectory();
 
@@ -82,12 +82,13 @@ router.post('/analyze-repo', async (ctx) => {
 
   console.log(investigationData);
 
-  //   // Update tracking lists
-  //   keyFiles.push(...files);
-  //   keyCommits.push(...commits);
+  // 4. & 5. Initial and iterative confirmation
+  const confirmationResponse = await confirmInvestigationDataWithLlm(taskDescription, context, investigationData, repoName);
 
-  //   // 4. & 5. Initial and iterative confirmation
-  //   const confirmationResponse = await queryGptWithConfirmation(investigationData);
+  console.log(confirmationResponse);
+
+  keyFiles = confirmationResponse.files;
+  keyCommits = confirmationResponse.commits;
 
   //   // 6. & 7. Send deep dive context for summary and confirm summary
   //   const summaryQuery = prepareSummaryQuery(taskDescription, confirmationResponse, keyFiles, keyCommits); // Implement this
