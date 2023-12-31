@@ -54,13 +54,9 @@ async function updateRepository(container, repoPath) {
     const defaultBranchCommand = `git -C ${repoPath} remote show origin | grep "HEAD branch" | cut -d" " -f5`;
     let defaultBranch = await executeCommandInContainer(container, defaultBranchCommand);
 
-    // Remove non-printable characters and trim whitespace
-    defaultBranch = defaultBranch.replace(/[^\x20-\x7E]+/g, '').trim();
-
     // Pull the latest changes from the default branch
-    const gitPullCommand = `git -C ${repoPath} pull origin ${defaultBranch}`; // origin ${defaultBranch.trim()}`;
+    const gitPullCommand = `git -C ${repoPath} pull origin ${defaultBranch.trim()}`; // origin ${defaultBranch.trim()}`;
     const msg = await executeCommandInContainer(container, gitPullCommand);
-    console.log(msg);
   } catch (error) {
     console.error('Error updating repository:', error);
     throw error;
@@ -86,13 +82,21 @@ async function executeCommandInContainer(container, command) {
     execStream.on('data', (chunk) => output.push(chunk.toString()));
 
     // 'end' event for resolving the promise
-    execStream.on('end', () => resolve(output.join('')));
+    execStream.on('end', () => {
+      // Remove non-printable characters except for newlines
+      const outputStr = output.join('').replace(/[^\x20-\x7E\n]+/g, '');
+      resolve(outputStr);
+    });
 
     // 'error' event for rejecting the promise
     execStream.on('error', reject);
 
     // Ensure stream is properly ended after data is captured
-    execStream.on('finish', () => resolve(output.join('')));
+    execStream.on('finish', () => {
+      // Remove non-printable characters except for newlines
+      const outputStr = output.join('').replace(/[^\x20-\x7E\n]+/g, '');
+      resolve(outputStr);
+    });
   });
 }
 
