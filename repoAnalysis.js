@@ -57,8 +57,6 @@ async function updateRepository(container, repoPath) {
     // Remove non-printable characters and trim whitespace
     defaultBranch = defaultBranch.replace(/[^\x20-\x7E]+/g, '').trim();
 
-    console.log('Cleaned Default Branch:', JSON.stringify(defaultBranch)); // Debugging
-
     // Pull the latest changes from the default branch
     const gitPullCommand = `git -C ${repoPath} pull origin ${defaultBranch}`; // origin ${defaultBranch.trim()}`;
     const msg = await executeCommandInContainer(container, gitPullCommand);
