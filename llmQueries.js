@@ -6,20 +6,21 @@
  * @returns {string} - The formulated query for GPT-4.
  */
 function prepareInvestigationQuery(taskDescription, context) {
-  // Start by describing the task
-  let query = `Task Description: ${taskDescription}\n\n`;
+  let query = `## Task Description\n${taskDescription}\n\n`;
 
-  // Add context about the repository
-  query += `Repository Context:\nDirectory Tree:\n${context.directoryTree}\n`;
-  query += `Recent Commits:\n${context.recentCommits}\n\n`;
+  // Add context about the repository with Markdown formatting
+  query += '## Repository Context\n';
+  query += `### Directory Tree\n\`\`\`\n${context.directoryTree}\n\`\`\`\n`;
+  query += `### Recent Commits\n\`\`\`\n${context.recentCommits}\n\`\`\`\n\n`;
 
   // Ask GPT-4 for specific files and commits to investigate
   query += 'Based on the above task description and repository context, ';
   query += 'which files and commits should be focused on for investigation? ';
-  query += 'Use json for your response, in the format {files: [], commits: []}.';
+  query += 'Please use JSON for your response, in the format \n```\n{files: [], commits: []}\n```';
 
   return query;
 }
+
 
 /**
  * Prepares a query for GPT to confirm the sufficiency of investigation data.
@@ -43,17 +44,34 @@ function prepareInvestigationQuery(taskDescription, context) {
  * @returns {string} - A string representing the formulated GPT query.
  */
 function prepareConfirmationQuery(taskDescription, context, investigationData) {
-  let query = `Task Description: ${taskDescription}\n\n`;
-  query += `Repository Context:\nDirectory Tree:\n${context.directoryTree}\n`;
-  query += `Recent Commits:\n${context.recentCommits}\n\n`;
-  query += `Current Investigation Data:\nFiles:\n${investigationData.files.map(file => file.name).join('\n')}\n`;
-  query += `Commits:\n${investigationData.commits.map(commit => commit.hash).join('\n')}\n\n`;
+  let query = `## Task Description\n${taskDescription}\n\n`;
+  query += `## Repository Context\n### Directory Tree\n\`\`\`\n${context.directoryTree}\n\`\`\`\n`;
+  query += `### Recent Commits\n\`\`\`\n${context.recentCommits}\n\`\`\`\n\n`;
+
+  // Include detailed information about each file with Markdown formatting
+  query += '## Current Investigation Data\n### Files\n';
+  investigationData.files.forEach(file => {
+    query += `- **File Name:** ${file.name}\n`;
+    query += `  - **Git Blame:**\n\`\`\`\n${file.blame}\n\`\`\`\n`;
+    query += `  - **Git History:**\n\`\`\`\n${file.history}\n\`\`\`\n`;
+  });
+
+  // Include detailed information about each commit with Markdown formatting
+  query += '### Commits\n';
+  investigationData.commits.forEach(commit => {
+    query += `- **Commit Hash:** ${commit.hash}\n`;
+    query += `  - **Commit Details:**\n\`\`\`\n${commit.details}\n\`\`\`\n`;
+  });
+
+  query += '## Confirmation\n';
   query += 'Is this information sufficient to complete the task? ';
   query += 'If not, what additional files or commits should be investigated? ';
-  query += 'Please respond in JSON format with {files: [], commits: []}.';
+  query += 'Please respond in JSON format with `{files: [], commits: []}`. ';
+  query += 'If no additional files or commits are needed, respond with `{files: [], commits: []}`.';
 
   return query;
 }
+
 
 
 module.exports = {
