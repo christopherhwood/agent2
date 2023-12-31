@@ -4,9 +4,9 @@ const Router = require('@koa/router');
 const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
-const { getInitialContext, fetchInvestigationData } = require('./repoAnalysis');
-const { prepareInvestigationQuery } = require('./llmQueries');
-const { queryLlmWithJsonCheck, confirmInvestigationDataWithLlm } = require('./llmService');
+const { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm } = require('./repoAnalysis');
+const { prepareInvestigationQuery, prepareSummaryQuery } = require('./llmQueries');
+const { queryLlmWithJsonCheck } = require('./llmService');
 
 setupDockerDirectory();
 
@@ -80,19 +80,27 @@ router.post('/analyze-repo', async (ctx) => {
 
   const investigationData = await fetchInvestigationData(investigationSuggestions, repoName);
 
+  console.log('investigationData:');
   console.log(investigationData);
 
   // 4. & 5. Initial and iterative confirmation
-  const confirmationResponse = await confirmInvestigationDataWithLlm(taskDescription, context, investigationData, repoName);
+  const confirmationResponse = await confirmInvestigationDataWithLlm(
+    taskDescription, 
+    context, 
+    investigationData, 
+    repoName, 
+    systemPrompt
+  );
 
+  console.log('confirmationResponse:');
   console.log(confirmationResponse);
 
   keyFiles = confirmationResponse.files;
   keyCommits = confirmationResponse.commits;
 
-  //   // 6. & 7. Send deep dive context for summary and confirm summary
-  //   const summaryQuery = prepareSummaryQuery(taskDescription, confirmationResponse, keyFiles, keyCommits); // Implement this
-  //   const finalSummary = await queryGptWithConfirmation(summaryQuery);
+  // 6. & 7. Send deep dive context for summary and confirm summary
+  const summaryQuery = prepareSummaryQuery(taskDescription, keyFiles, keyCommits); // Implement this
+  // const finalSummary = await queryGptWithConfirmation(summaryQuery);
 
 //   // 8. Return finalized summary and tracked items to the user
 //   ctx.body = { summary: finalSummary, keyFiles, keyCommits };

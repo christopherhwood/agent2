@@ -1,6 +1,8 @@
 const Docker = require('dockerode');
 const fs = require('fs');
 const os = require('os');
+const { prepareConfirmationQuery } = require('./llmQueries');
+const { iterateLlmQuery } = require('./llmService');
 const docker = new Docker();
 
 const hostRepoPath = '/var/qckfx/repos';
@@ -17,8 +19,8 @@ async function getInitialContext(repoName) {
     await updateRepository(container, '/repo');
 
     // Execute commands to get directory tree and recent commits
-    const directoryTree = await executeCommandInContainer(container, 'tree /repo -I "node_modules|.git"');
-    const recentCommits = await executeCommandInContainer(container, 'git -C /repo log -n 10 --pretty=format:"%h - %an, %ar : %s"');
+    const directoryTree = await executeCommandInContainer(container, 'tree /repo -I "node_modules|.git|package-lock.json"');
+    const recentCommits = await executeCommandInContainer(container, 'git -C /repo log -n 5 --pretty=format:"%h - %an, %ar : %s"');
 
     return {
       directoryTree,
@@ -55,7 +57,7 @@ async function fetchInvestigationData(gptResponse, repoName) {
     // Fetch Git blame and history for each identified file
     for (const fileName of files) {
       const gitBlame = await executeCommandInContainer(container, `git -C /repo blame ${fileName}`);
-      const gitHistory = await executeCommandInContainer(container, `git -C /repo log -- ${fileName}`);
+      const gitHistory = await executeCommandInContainer(container, `git -C /repo log -n 3 --pretty=format:"%h - %an, %ar : %s" -- ${fileName}`);
       filesData.push({ name: fileName, blame: gitBlame, history: gitHistory });
     }
 
@@ -76,6 +78,24 @@ async function fetchInvestigationData(gptResponse, repoName) {
       await container.remove();
     }
   }
+}
+
+async function confirmInvestigationDataWithLlm(taskDescription, initialContext, investigationData, repoName, systemPrompt) {
+  let currentInvestigationData = investigationData;
+
+  async function refineInvestigationQuery(llmResponse, currentQuery) {
+    // Assuming fetchInvestigationData and mergeInvestigationData are async functions
+    const additionalData = await fetchInvestigationData(llmResponse, repoName);
+    return prepareConfirmationQuery(taskDescription, initialContext, mergeInvestigationData(currentInvestigationData, additionalData));
+  }
+
+  function isInvestigationDataSufficient(llmResponse) {
+    return llmResponse.files.length === 0 && llmResponse.commits.length === 0 || isSubsetOfCurrentData(llmResponse, currentInvestigationData);
+  }
+
+  const initialQuery = prepareConfirmationQuery(taskDescription, initialContext, investigationData);
+
+  return iterateLlmQuery(initialQuery, refineInvestigationQuery, isInvestigationDataSufficient, systemPrompt);
 }
 
 async function createAnalysisContainer(repoName) {
@@ -103,7 +123,7 @@ async function updateRepository(container, repoPath) {
 
     // Pull the latest changes from the default branch
     const gitPullCommand = `git -C ${repoPath} pull origin ${defaultBranch.trim()}`; // origin ${defaultBranch.trim()}`;
-    const msg = await executeCommandInContainer(container, gitPullCommand);
+    await executeCommandInContainer(container, gitPullCommand);
   } catch (error) {
     console.error('Error updating repository:', error);
     throw error;
@@ -147,5 +167,20 @@ async function executeCommandInContainer(container, command) {
   });
 }
 
+function mergeInvestigationData(existingData, additionalData) {
+  const mergedFiles = [...new Set([...existingData.files, ...additionalData.files])];
+  const mergedCommits = [...new Set([...existingData.commits, ...additionalData.commits])];
 
-module.exports = { getInitialContext, fetchInvestigationData };
+  return { files: mergedFiles, commits: mergedCommits };
+}
+
+function isSubsetOfCurrentData(llmResponse, currentData) {
+  const allFiles = new Set(currentData.files.map(file => file.name));
+  const allCommits = new Set(currentData.commits.map(commit => commit.hash));
+
+  return llmResponse.files.every(file => allFiles.has(file)) &&
+         llmResponse.commits.every(commit => allCommits.has(commit));
+}
+
+
+module.exports = { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm };

@@ -72,9 +72,47 @@ function prepareConfirmationQuery(taskDescription, context, investigationData) {
   return query;
 }
 
+/**
+ * Prepares a query to summarize the investigation data in relation to the task description,
+ * using Markdown for formatting and recommending the inclusion of code snippets and commit hashes.
+ *
+ * @param {string} taskDescription - The original task description provided by the user.
+ * @param {array} keyFiles - Array of key files relevant to the task.
+ * @param {array} keyCommits - Array of key commits relevant to the task.
+ * @returns {string} - The formulated summary query for GPT.
+ */
+function prepareSummaryQuery(taskDescription, keyFiles, keyCommits) {
+  let query = `## Task Description\n${taskDescription}\n\n`;
+
+  // Add details about the key files and commits with Markdown formatting
+  query += '## Key Investigation Data\n';
+  query += '### Files\n';
+  keyFiles.forEach(file => {
+    query += `- **File Name:** ${file.name}\n`;
+    query += `  - **Details:**\n\`\`\`\n${file.details}\n\`\`\`\n`;
+  });
+  query += '### Commits\n';
+  keyCommits.forEach(commit => {
+    query += `- **Commit Hash:** ${commit.hash}\n`;
+    query += `  - **Details:**\n\`\`\`\n${commit.details}\n\`\`\`\n`;
+  });
+
+  // Specific instructions for the summary
+  query += '## Summary Request\n';
+  query += 'Based on the task description and the key investigation data above, ';
+  query += 'please provide a comprehensive summary. The summary should: \n';
+  query += '- Focus on the relevance of the identified files and commits to the task.\n';
+  query += '- Include code snippets and commit hashes where relevant for context.\n';
+  query += '- Use Markdown formatting to enhance readability and structure.\n';
+  query += '- Be concise yet informative, highlighting crucial insights.\n';
+
+  return query;
+}
+
 
 
 module.exports = {
   prepareInvestigationQuery,
-  prepareConfirmationQuery
+  prepareConfirmationQuery,
+  prepareSummaryQuery
 };
