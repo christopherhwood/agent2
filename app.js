@@ -5,6 +5,8 @@ const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
 const { getInitialContext } = require('./repoAnalysis');
+const { prepareInvestigationQuery } = require('./llmQueries');
+const { queryLlmWithJsonCheck } = require('./llmService');
 
 setupDockerDirectory();
 
@@ -67,12 +69,15 @@ router.post('/analyze-repo', async (ctx) => {
   const repoName = extractRepoName(gitRepoUrl);
 
   // 1. Get directory tree & recent commits
-  const context = await getInitialContext(repoName); // Implement this
+  const context = await getInitialContext(repoName); 
   console.log(context);
 
-  //   // 2. & 3. Get and fetch investigation suggestions
-  //   const investigationQuery = prepareInvestigationQuery(taskDescription, context); // Implement this
-  //   const investigationSuggestions = await queryGpt4WithJsonCheck(investigationQuery);
+  // 2. & 3. Get and fetch investigation suggestions
+  const investigationQuery = prepareInvestigationQuery(taskDescription, context);
+  const systemPrompt = 'You are a software development expert tasked with analyzing a Git repository. Based on the provided directory structure and recent commit history, identify key areas and aspects relevant to the user\'s specific task. Provide clear, concise insights into which files or commits are crucial. Your analysis should guide the user in focusing their efforts on the most relevant parts of the code.';
+  const investigationSuggestions = await queryLlmWithJsonCheck(investigationQuery, systemPrompt);
+  console.log(investigationSuggestions);
+
   //   const { investigationData, files, commits } = await fetchInvestigationData(investigationSuggestions, gitRepoUrl); // Implement this
 
   //   // Update tracking lists
