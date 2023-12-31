@@ -26,6 +26,8 @@ async function getInitialContext(repoName) {
 
     await container.start();
 
+    await updateRepository(container, '/repo');
+
     // Execute commands to get directory tree and recent commits
     const directoryTree = await executeCommandInContainer(container, 'tree /repo -I "node_modules|.git"');
     const recentCommits = await executeCommandInContainer(container, 'git -C /repo log -n 10 --pretty=format:"%h - %an, %ar : %s"');
@@ -46,8 +48,30 @@ async function getInitialContext(repoName) {
   }
 }
 
+async function updateRepository(container, repoPath) {
+  try {
+    // Determine the default branch
+    const defaultBranchCommand = `git -C ${repoPath} remote show origin | grep "HEAD branch" | cut -d" " -f5`;
+    let defaultBranch = await executeCommandInContainer(container, defaultBranchCommand);
+
+    // Remove non-printable characters and trim whitespace
+    defaultBranch = defaultBranch.replace(/[^\x20-\x7E]+/g, '').trim();
+
+    console.log('Cleaned Default Branch:', JSON.stringify(defaultBranch)); // Debugging
+
+    // Pull the latest changes from the default branch
+    const gitPullCommand = `git -C ${repoPath} pull origin ${defaultBranch}`; // origin ${defaultBranch.trim()}`;
+    const msg = await executeCommandInContainer(container, gitPullCommand);
+    console.log(msg);
+  } catch (error) {
+    console.error('Error updating repository:', error);
+    throw error;
+  }
+}
+
 // Function to execute a command inside a Docker container
 async function executeCommandInContainer(container, command) {
+  console.log('command = ' + command);
   const exec = await container.exec({
     Cmd: ['bash', '-c', command],
     AttachStdout: true,
