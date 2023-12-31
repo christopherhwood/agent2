@@ -10,19 +10,7 @@ async function getInitialContext(repoName) {
   let container = null;
 
   try {
-    const repoPath = fs.existsSync(hostRepoPath) 
-      ? hostRepoPath 
-      : fallbackHostRepoPath;
-    const bindMount = `${repoPath}/${repoName}:/repo`;
-
-    // Create a temporary container for analysis
-    container = await docker.createContainer({
-      Image: 'qckfx-sandbox', // has tree installed
-      Cmd: ['/bin/bash'],
-      Tty: true,
-      Volumes: { '/repo': {} },
-      HostConfig: { Binds: [bindMount] }
-    });
+    container = await createAnalysisContainer(repoName);
 
     await container.start();
 
@@ -46,6 +34,65 @@ async function getInitialContext(repoName) {
       await container.remove();
     }
   }
+}
+
+async function fetchInvestigationData(gptResponse, repoName) {
+  // Initialize structures to hold investigation data
+  let filesData = [];
+  let commitsData = [];
+
+  // Parse GPT-4 response
+  const { files, commits } = gptResponse;
+
+  let container = null;
+
+  try {
+    // Create a temporary container for fetching data
+    container = await createAnalysisContainer(repoName);
+
+    await container.start();
+
+    // Fetch Git blame and history for each identified file
+    for (const fileName of files) {
+      const gitBlame = await executeCommandInContainer(container, `git -C /repo blame ${fileName}`);
+      const gitHistory = await executeCommandInContainer(container, `git -C /repo log -- ${fileName}`);
+      filesData.push({ name: fileName, blame: gitBlame, history: gitHistory });
+    }
+
+    // Fetch data for each identified commit
+    for (const commitHash of commits) {
+      const commitDetails = await executeCommandInContainer(container, `git -C /repo show ${commitHash}`);
+      commitsData.push({ hash: commitHash, details: commitDetails });
+    }
+
+    return { files: filesData, commits: commitsData };
+  } catch (error) {
+    console.error('Error fetching investigation data:', error);
+    throw error;
+  } finally {
+    // Clean up: stop and remove the temporary container
+    if (container) {
+      await container.stop();
+      await container.remove();
+    }
+  }
+}
+
+async function createAnalysisContainer(repoName) {
+  const repoPath = fs.existsSync(hostRepoPath) 
+    ? hostRepoPath 
+    : fallbackHostRepoPath;
+  const bindMount = `${repoPath}/${repoName}:/repo`;
+
+  // Create a temporary container for analysis
+  const container = await docker.createContainer({
+    Image: 'qckfx-sandbox', // has tree installed
+    Cmd: ['/bin/bash'],
+    Tty: true,
+    Volumes: { '/repo': {} },
+    HostConfig: { Binds: [bindMount] }
+  });
+  return container;
 }
 
 async function updateRepository(container, repoPath) {
@@ -101,4 +148,4 @@ async function executeCommandInContainer(container, command) {
 }
 
 
-module.exports = { getInitialContext };
+module.exports = { getInitialContext, fetchInvestigationData };

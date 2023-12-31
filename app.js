@@ -4,7 +4,7 @@ const Router = require('@koa/router');
 const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
-const { getInitialContext } = require('./repoAnalysis');
+const { getInitialContext, fetchInvestigationData } = require('./repoAnalysis');
 const { prepareInvestigationQuery } = require('./llmQueries');
 const { queryLlmWithJsonCheck } = require('./llmService');
 
@@ -78,7 +78,9 @@ router.post('/analyze-repo', async (ctx) => {
   const investigationSuggestions = await queryLlmWithJsonCheck(investigationQuery, systemPrompt);
   console.log(investigationSuggestions);
 
-  //   const { investigationData, files, commits } = await fetchInvestigationData(investigationSuggestions, gitRepoUrl); // Implement this
+  const investigationData = await fetchInvestigationData(investigationSuggestions, repoName);
+
+  console.log(investigationData);
 
   //   // Update tracking lists
   //   keyFiles.push(...files);
