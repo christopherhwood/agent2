@@ -89,7 +89,8 @@ function prepareSummaryQuery(taskDescription, keyFiles, keyCommits) {
   query += '### Files\n';
   keyFiles.forEach(file => {
     query += `- **File Name:** ${file.name}\n`;
-    query += `  - **Details:**\n\`\`\`\n${file.details}\n\`\`\`\n`;
+    query += `  - **Git Blame:**\n\`\`\`\n${file.blame}\n\`\`\`\n`;
+    query += `  - **Git History:**\n\`\`\`\n${file.history}\n\`\`\`\n`;
   });
   query += '### Commits\n';
   keyCommits.forEach(commit => {
@@ -109,10 +110,46 @@ function prepareSummaryQuery(taskDescription, keyFiles, keyCommits) {
   return query;
 }
 
+function prepareSummaryConfirmationQuery(summary, taskDescription, keyFiles, keyCommits) {
+  let query = `## Summary for Confirmation\n${summary}\n\n`;
+  query += `## Task Description\n${taskDescription}\n\n`;
+
+  // Include detailed information about key files
+  query += '## Key Files Involved in the Task\n';
+  keyFiles.forEach(file => {
+    query += `- **File Name:** ${file.name}\n`;
+    // Assuming file.blame and file.history are available here as well
+    query += `  - **Git Blame:**\n\`\`\`\n${file.blame}\n\`\`\`\n`;
+    query += `  - **Git History:**\n\`\`\`\n${file.history}\n\`\`\`\n`;
+  });
+
+  // Include detailed information about key commits
+  query += '## Key Commits Involved in the Task\n';
+  keyCommits.forEach(commit => {
+    // Assuming commit.details is available here
+    query += `- **Commit Hash:** ${commit.hash}\n`;
+    query += `  - **Commit Details:**\n\`\`\`\n${commit.details}\n\`\`\`\n`;
+  });
+
+  query += '## Confirmation Request\n';
+  query += 'Examine the above summary. Determine if it is sufficient and accurate for the task description and the key investigation data. ';
+  query += 'If it is sufficient, respond with "ok". If not, please provide a revised summary.';
+  query += 'Revised summaries must be complete and not reference the previous summary.\n\n';
+  query += 'A revised summary should: \n';
+  query += '- Focus on the relevance of the identified files and commits to the task.\n';
+  query += '- Include code snippets and commit hashes where relevant for context.\n';
+  query += '- Use Markdown formatting to enhance readability and structure.\n';
+  query += '- Be concise yet informative, highlighting crucial insights.\n';
+
+  return query;
+}
+
+
 
 
 module.exports = {
   prepareInvestigationQuery,
   prepareConfirmationQuery,
-  prepareSummaryQuery
+  prepareSummaryQuery,
+  prepareSummaryConfirmationQuery
 };

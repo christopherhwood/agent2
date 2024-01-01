@@ -1,8 +1,8 @@
 const Docker = require('dockerode');
 const fs = require('fs');
 const os = require('os');
-const { prepareConfirmationQuery } = require('./llmQueries');
-const { iterateLlmQuery } = require('./llmService');
+const { prepareConfirmationQuery, prepareSummaryConfirmationQuery } = require('./llmQueries');
+const { queryLlm, queryLlmWithJsonCheck, iterateLlmQuery } = require('./llmService');
 const docker = new Docker();
 
 const hostRepoPath = '/var/qckfx/repos';
@@ -20,7 +20,7 @@ async function getInitialContext(repoName) {
 
     // Execute commands to get directory tree and recent commits
     const directoryTree = await executeCommandInContainer(container, 'tree /repo -I "node_modules|.git|package-lock.json"');
-    const recentCommits = await executeCommandInContainer(container, 'git -C /repo log -n 5 --pretty=format:"%h - %an, %ar : %s"');
+    const recentCommits = await executeCommandInContainer(container, 'git --no-pager -C /repo log -n 5 --pretty=format:"%h - %an, %ar : %s"');
 
     return {
       directoryTree,
@@ -56,8 +56,8 @@ async function fetchInvestigationData(gptResponse, repoName) {
 
     // Fetch Git blame and history for each identified file
     for (const fileName of files) {
-      const gitBlame = await executeCommandInContainer(container, `git -C /repo blame ${fileName}`);
-      const gitHistory = await executeCommandInContainer(container, `git -C /repo log -n 3 --pretty=format:"%h - %an, %ar : %s" -- ${fileName}`);
+      const gitBlame = await executeCommandInContainer(container, `git --no-pager -C /repo blame ${fileName}`);
+      const gitHistory = await executeCommandInContainer(container, `git --no-pager -C /repo log -n 3 --pretty=format:"%h - %an, %ar : %s" -- ${fileName}`);
       filesData.push({ name: fileName, blame: gitBlame, history: gitHistory });
     }
 
@@ -84,9 +84,11 @@ async function confirmInvestigationDataWithLlm(taskDescription, initialContext, 
   let currentInvestigationData = investigationData;
 
   async function refineInvestigationQuery(llmResponse, currentQuery) {
-    // Assuming fetchInvestigationData and mergeInvestigationData are async functions
-    const additionalData = await fetchInvestigationData(llmResponse, repoName);
-    return prepareConfirmationQuery(taskDescription, initialContext, mergeInvestigationData(currentInvestigationData, additionalData));
+    if (llmResponse.files.length > 0 || llmResponse.commits.length > 0) {
+      const additionalData = await fetchInvestigationData(llmResponse, repoName);
+      currentInvestigationData = mergeInvestigationData(currentInvestigationData, additionalData);
+    }
+    return prepareConfirmationQuery(taskDescription, initialContext, currentInvestigationData);
   }
 
   function isInvestigationDataSufficient(llmResponse) {
@@ -95,7 +97,22 @@ async function confirmInvestigationDataWithLlm(taskDescription, initialContext, 
 
   const initialQuery = prepareConfirmationQuery(taskDescription, initialContext, investigationData);
 
-  return iterateLlmQuery(initialQuery, refineInvestigationQuery, isInvestigationDataSufficient, systemPrompt);
+  await iterateLlmQuery(initialQuery, refineInvestigationQuery, isInvestigationDataSufficient, systemPrompt, confirmInvestigationQueryWithVerification);
+  return currentInvestigationData;
+}
+
+async function confirmInvestigationQueryWithVerification(messages) {
+  const validation = (jsonResponse) => {
+    if (!jsonResponse.files) {
+      jsonResponse.files = []; // Set default value if 'files' key is missing
+    }
+    if (!jsonResponse.commits) {
+      jsonResponse.commits = []; // Set default value if 'commits' key is missing
+    }
+    return jsonResponse;
+  };
+
+  return queryLlmWithJsonCheck(messages, validation);
 }
 
 async function createAnalysisContainer(repoName) {
@@ -115,14 +132,45 @@ async function createAnalysisContainer(repoName) {
   return container;
 }
 
+async function generateAndConfirmSummaryWithLlm(summaryQuery, taskDescription, keyFiles, keyCommits, systemPrompt) {
+  // First, get the initial summary from GPT
+  let summaryResponse = await queryLlm([{role: 'system', content: systemPrompt}, {role: 'user', content: summaryQuery}]);
+  console.log('initialSummaryResponse:');
+  console.log(summaryResponse);
+
+  // Prepare the query to confirm the summary
+  const initialConfirmationQuery = prepareSummaryConfirmationQuery(summaryResponse, taskDescription, keyFiles, keyCommits);
+
+  async function refineSummaryQueryFunction(llmResponse, currentQuery) {
+    if (!llmResponse.includes('ok') && llmResponse.length < 10) {
+      summaryResponse = llmResponse;
+    }
+    return prepareSummaryConfirmationQuery(llmResponse, taskDescription, keyFiles, keyCommits);
+  }
+
+  function isSummarySufficientFunction(llmResponse) {
+    // Check if GPT's response is "ok", indicating the summary is sufficient
+    return llmResponse.includes('ok') && llmResponse.length < 10;
+  }
+
+  // Check if the initial summary response is already sufficient
+  if (isSummarySufficientFunction(summaryResponse)) {
+    return summaryResponse; // If the initial response is sufficient
+  }
+
+  // Use iterateLlmQuery for the iterative confirmation process
+  await iterateLlmQuery(initialConfirmationQuery, refineSummaryQueryFunction, isSummarySufficientFunction, systemPrompt, queryLlm);
+  return summaryResponse;
+}
+
 async function updateRepository(container, repoPath) {
   try {
     // Determine the default branch
-    const defaultBranchCommand = `git -C ${repoPath} remote show origin | grep "HEAD branch" | cut -d" " -f5`;
+    const defaultBranchCommand = `git --no-pager -C ${repoPath} remote show origin | grep "HEAD branch" | cut -d" " -f5`;
     let defaultBranch = await executeCommandInContainer(container, defaultBranchCommand);
 
     // Pull the latest changes from the default branch
-    const gitPullCommand = `git -C ${repoPath} pull origin ${defaultBranch.trim()}`; // origin ${defaultBranch.trim()}`;
+    const gitPullCommand = `git --no-pager -C ${repoPath} pull origin ${defaultBranch.trim()}`; // origin ${defaultBranch.trim()}`;
     await executeCommandInContainer(container, gitPullCommand);
   } catch (error) {
     console.error('Error updating repository:', error);
@@ -139,33 +187,27 @@ async function executeCommandInContainer(container, command) {
     AttachStderr: true
   });
 
-  // Start the exec command
   const execStream = await exec.start({ Detach: false });
+  execStream.setEncoding('utf8');
 
   return new Promise((resolve, reject) => {
     const output = [];
-    
-    // 'data' event for capturing stdout output
-    execStream.on('data', (chunk) => output.push(chunk.toString()));
 
-    // 'end' event for resolving the promise
+    execStream.on('data', (chunk) => {
+      // The first 8 bytes of the stream are a header used by docker, so we skip them
+      output.push(chunk.slice(8));
+    });
+
     execStream.on('end', () => {
-      // Remove non-printable characters except for newlines
-      const outputStr = output.join('').replace(/[^\x20-\x7E\n]+/g, '');
+      const outputStr = output.toString().replace(/[^\x20-\x7E\n]+/g, '');
+      console.log('Output:', outputStr);
       resolve(outputStr);
     });
 
-    // 'error' event for rejecting the promise
     execStream.on('error', reject);
-
-    // Ensure stream is properly ended after data is captured
-    execStream.on('finish', () => {
-      // Remove non-printable characters except for newlines
-      const outputStr = output.join('').replace(/[^\x20-\x7E\n]+/g, '');
-      resolve(outputStr);
-    });
   });
 }
+
 
 function mergeInvestigationData(existingData, additionalData) {
   const mergedFiles = [...new Set([...existingData.files, ...additionalData.files])];
@@ -183,4 +225,4 @@ function isSubsetOfCurrentData(llmResponse, currentData) {
 }
 
 
-module.exports = { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm };
+module.exports = { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm, generateAndConfirmSummaryWithLlm };

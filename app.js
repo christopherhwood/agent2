@@ -4,7 +4,7 @@ const Router = require('@koa/router');
 const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
-const { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm } = require('./repoAnalysis');
+const { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm, generateAndConfirmSummaryWithLlm } = require('./repoAnalysis');
 const { prepareInvestigationQuery, prepareSummaryQuery } = require('./llmQueries');
 const { queryLlmWithJsonCheck } = require('./llmService');
 
@@ -74,8 +74,8 @@ router.post('/analyze-repo', async (ctx) => {
 
   // 2. & 3. Get and fetch investigation suggestions
   const investigationQuery = prepareInvestigationQuery(taskDescription, context);
-  const systemPrompt = 'You are a software development expert tasked with analyzing a Git repository. Based on the provided directory structure and recent commit history, identify key areas and aspects relevant to the user\'s specific task. Provide clear, concise insights into which files or commits are crucial. Your analysis should guide the user in focusing their efforts on the most relevant parts of the code.';
-  const investigationSuggestions = await queryLlmWithJsonCheck(investigationQuery, systemPrompt);
+  let systemPrompt = 'You are a software development expert tasked with analyzing a Git repository. Based on the provided directory structure and recent commit history, identify key areas and aspects relevant to the user\'s specific task. Provide clear, concise insights into which files or commits are crucial. Your analysis should guide the user in focusing their efforts on the most relevant parts of the code.';
+  const investigationSuggestions = await queryLlmWithJsonCheck([{role: 'system', content: systemPrompt}, {role: 'user', content: investigationQuery}], validateInvestigationResponse);
   console.log(investigationSuggestions);
 
   const investigationData = await fetchInvestigationData(investigationSuggestions, repoName);
@@ -99,11 +99,12 @@ router.post('/analyze-repo', async (ctx) => {
   keyCommits = confirmationResponse.commits;
 
   // 6. & 7. Send deep dive context for summary and confirm summary
-  const summaryQuery = prepareSummaryQuery(taskDescription, keyFiles, keyCommits); // Implement this
-  // const finalSummary = await queryGptWithConfirmation(summaryQuery);
+  const summaryQuery = prepareSummaryQuery(taskDescription, keyFiles, keyCommits);
+  systemPrompt = 'You are a software development expert with a focus on synthesizing complex data into clear summaries. Your task is to analyze key files and commits from a Git repository and provide a comprehensive summary. This summary should integrate the provided information, focusing on the relevance of each file and commit to the user\'s specific task. Use the detailed Git blame and history data to add depth to your summary, ensuring it\'s informative and provides insights into how each piece of data contributes to the overall task. Structure your summary using Markdown for clarity, and be concise yet thorough in your explanation, highlighting the most crucial insights.';
+  const finalSummary = await generateAndConfirmSummaryWithLlm(summaryQuery, taskDescription, keyFiles, keyCommits, systemPrompt);
 
-//   // 8. Return finalized summary and tracked items to the user
-//   ctx.body = { summary: finalSummary, keyFiles, keyCommits };
+  // 8. Return finalized summary and tracked items to the user
+  ctx.body = { summary: finalSummary, keyFiles, keyCommits };
 });
 
 
@@ -117,3 +118,13 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
+function validateInvestigationResponse(jsonResponse) {
+  if (!jsonResponse.files) {
+    jsonResponse.files = []; // Set default value if 'files' key is missing
+  }
+  if (!jsonResponse.commits) {
+    jsonResponse.commits = []; // Set default value if 'commits' key is missing
+  }
+  return jsonResponse;
+}
+  
