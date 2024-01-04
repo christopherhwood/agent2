@@ -43,14 +43,15 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse) {
   console.log('messages:');
   console.log(messages);
   try {
-    const response = await openai.chat.completions.create({
+    const request = {
       model: 'gpt-4-1106-preview',
       messages: messages,
       max_tokens: 4096,
       temperature: 0,
       top_p: 1,
       response_format: {type: 'json_object'}
-    });
+    };
+    const response = await openai.chat.completions.create();
 
     let jsonResponse;
     try {
@@ -66,6 +67,43 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse) {
     }
 
     return jsonResponse;
+  } catch (error) {
+    console.error('Error querying LLM:', error);
+    throw error;
+  }
+}
+
+async function queryLlmWithTools(messages, tools) {
+  console.log('messages:');
+  console.log(messages);
+  console.log('tools:');
+  console.log(tools);
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4-1106-preview',
+      messages: messages,
+      max_tokens: 4096,
+      temperature: 0,
+      top_p: 1,
+      tools: tools,
+      tool_choice: 'auto'
+    });
+
+    let toolCalls = response.choices[0].message.tool_calls;
+    try {
+      validateToolCalls(toolCalls, tools);
+    } catch (error) {
+      console.error('Error validating tool calls:', error);
+      throw error;
+    } 
+
+    toolCalls = toolCalls.map(toolCall => {
+      return {
+        function: toolCall.function.name,
+        arguments: JSON.parse(toolCall.function.arguments)
+      };
+    });
+    return toolCalls;
   } catch (error) {
     console.error('Error querying LLM:', error);
     throw error;
@@ -124,8 +162,64 @@ async function iterateLlmQuery(
   return llmResponse; // Return the last GPT response
 }
 
+function validateToolCalls(toolCalls, tools) {
+  // Tool call looks like this: 
+  // {
+  //   function: {
+  //     name: 'createFile',
+  //     arguments: "{path: 'src/index.js', contents: 'console.log('Hello, world!')'}"
+  //   }
+  // }
+  
+  // Tool looks like this: 
+  // {
+  //    type: 'function',
+  //    function: {
+  //      name: 'createFile',
+  //      description: 'Creates a new file with the provided contents. Useful for creating new files for functions or logic that does not belong in existing files.',
+  //      parameters: {
+  //        type: 'object',
+  //        properties: {
+  //          path: {
+  //            type: 'string',
+  //            description: 'The relative path to the file to create. Paths must be relative to the root of the repository.'
+  //          },
+  //          contents: {
+  //            type: 'string',
+  //            description: 'The contents to write to the file.'
+  //          }
+  //        },
+  //        required: ['path', 'contents']
+  //      }
+  //    }
+  //  }
+
+  // The goal of this function is to validate that the tool calls are valid and match the tools provided.
+  // This function should throw an error if the tool calls are invalid.
+  // This function should also throw an error if the tool calls don't match the tools provided.
+  // This function should return true if the tool calls are valid and match the tools provided.
+
+  // Validate that the tool calls are valid
+  for (const toolCall of toolCalls) {
+    const tool = tools.find(tool => tool.function.name === toolCall.function.name);
+    if (!tool) {
+      throw new Error(`Tool call ${toolCall.function.name} is invalid.`);
+    }
+    // Validate that the required properties are present
+    const toolParameters = tool.function.parameters.required;
+    const toolCallParameters = JSON.parse(toolCall.function.arguments);
+    for (const parameter of toolParameters) {
+      if (!toolCallParameters[parameter]) {
+        throw new Error(`Tool call ${toolCall.function.name} is missing required parameter ${parameter}.`);
+      }
+    }
+  }
+  return true;
+}
+
 module.exports = {
   queryLlm,
   queryLlmWithJsonCheck,
+  queryLlmWithTools,
   iterateLlmQuery
 };

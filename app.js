@@ -6,6 +6,7 @@ const { cloneRepositoryInContainer } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
 const { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm, generateAndConfirmSummaryWithLlm } = require('./repoAnalysis');
 const { generateRoughPlan, generateTaskTree } = require('./planner');
+const { resolveTasks } = require('./coder');
 const { prepareInvestigationQuery, prepareSummaryQuery } = require('./llmQueries');
 const { queryLlmWithJsonCheck } = require('./llmService');
 
@@ -121,6 +122,23 @@ router.post('/generate-plan', async (ctx) => {
     ctx.body = { message: 'Task list generated successfully', tasks: taskTree };
   } catch (error) {
     console.error('Error in /plan-api:', error.message);
+    ctx.status = 500;
+    ctx.body = { error: 'Error processing your request' };
+  }
+});
+
+router.post('/resolve-tasks', async (ctx) => {
+  try {
+    const { task, keyFilesAndCommits, repoUrl } = ctx.request.body;
+    const repoName = extractRepoName(repoUrl);
+    // Checkout new branch
+    // Resolve tasks
+    const resolvedTasks = await resolveTasks(task, keyFilesAndCommits, repoName);
+    // Submit PR
+    ctx.status = 200;
+    ctx.body = { message: 'Tasks resolved successfully', tasks: resolvedTasks };
+  } catch (error) {
+    console.error('Error in /resolve-tasks:', error);
     ctx.status = 500;
     ctx.body = { error: 'Error processing your request' };
   }

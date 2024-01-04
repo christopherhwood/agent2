@@ -223,6 +223,39 @@ function prepareTaskTreeConfirmationQuery(taskTree, taskDescription, summary, ro
   return query;
 }
 
+function prepareTaskResolutionQuery(targetTask, rootTask, keyFilesAndCommits) {
+  let query = '# Task\n';
+  const buildTaskTree = (level, task) => {
+    // Build a query like: 
+    // ## Top Level Task Title
+    // Top Level Task Description
+    // ### Child Task Title
+    // Child Task Description
+    if (task === targetTask) {
+      query += `${'#'.repeat(level + 1)} TODO - ${task.title}\n`;
+    } else {
+      query += `${'#'.repeat(level + 1)} ${task.title}\n`;
+    }
+    query += `${task.description}\n`;
+    if (task.subtasks.length > 0) {
+      for (const subtask of task.subtasks) {
+        if (!buildTaskTree(level + 1, subtask)) {
+          return false;
+        }
+      }
+    } else if (task.title[0] !== '~') {
+      return false;
+    }
+    return true;
+  };
+  buildTaskTree(0, rootTask);
+  
+  query += `# Key Files & Commits\n${JSON.stringify(keyFilesAndCommits)}\n\n`;
+  query += '## Request\n';
+  query += 'Use the tools at your disposal to resolve the above task. ';
+
+  return query;
+}
 
 module.exports = {
   prepareInvestigationQuery,
@@ -232,5 +265,6 @@ module.exports = {
   prepareRoughPlanQuery,
   prepareRoughPlanConfirmationQuery,
   prepareTaskTreeQuery,
-  prepareTaskTreeConfirmationQuery
+  prepareTaskTreeConfirmationQuery,
+  prepareTaskResolutionQuery
 };
