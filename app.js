@@ -114,7 +114,7 @@ router.post('/plan-api', async (ctx) => {
     // Example: const tasks = await generateTasksUsingGpt4(summary);
 
     ctx.status = 200;
-    ctx.body = { message: 'Task list generated successfully', tasks: [], summary: '' };
+    ctx.body = { message: 'Task list generated successfully', tasks: [] };
   } catch (error) {
     console.error('Error in /plan-api:', error.message);
     ctx.status = 500;
