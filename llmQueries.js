@@ -133,7 +133,7 @@ function prepareSummaryConfirmationQuery(summary, taskDescription, keyFiles, key
 
   query += '## Confirmation Request\n';
   query += 'Examine the above summary. Determine if it is sufficient and accurate for the task description and the key investigation data. ';
-  query += 'If it is sufficient, respond with "ok". If not, please provide a revised summary.';
+  query += 'If it is sufficient, respond with "ok". If not, make edits where needed and provide a revised summary.';
   query += 'Revised summaries must be complete and not reference the previous summary.\n\n';
   query += 'A revised summary should: \n';
   query += '- Focus on the relevance of the identified files and commits to the task.\n';
