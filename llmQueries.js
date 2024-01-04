@@ -182,6 +182,47 @@ function prepareRoughPlanConfirmationQuery(roughPlan, taskDescription, summary) 
   return query;
 }
 
+function prepareTaskTreeQuery(taskDescription, summary, roughPlan) {
+  let query = `## Task Description\n${taskDescription}\n\n`;
+  query += `## Summary\n${summary}\n\n`;
+  query += `## Rough Plan\n${roughPlan}\n\n`;
+
+  query += '## Task Tree Request\n';
+  query += 'Based on the task description, summary, and rough plan above, ';
+  query += 'please provide a task tree for completing the task. ';
+  query += 'The task tree should include a list of steps to follow, ';
+  query += 'and leaf tasks should be granular to the point of only requiring inserting code, replacing code, deleting code, or executing a terminal command (like npm commands, creating a new file, etc). ';
+  query += 'Each leaf task should be as detailed as possible in the description and should explicitly mention whether code should be added, replaced, or deleted or if a terminal command is needed. ';
+  query += 'DO NOT include tasks like reviewing files that are already attached. Instead, distill the keypoints from those files into the plan. ';
+  query += 'DO NOT include setting up the environment or cloning the repo. ';
+  query += 'DO NOT include committing changes, deployment, code review, or documentation. ';
+  query += 'Reply using json with the following recursive structure: {title: "", description: "", subtasks: []}.';
+
+  return query;
+}
+
+function prepareTaskTreeConfirmationQuery(taskTree, taskDescription, summary, roughPlan) {
+  let query = `## Task Tree for Confirmation\n${JSON.stringify(taskTree)}\n\n`;
+  query += `## Task Description\n${taskDescription}\n\n`;
+  query += `## Summary\n${summary}\n\n`;
+  query += `## Rough Plan\n${roughPlan}\n\n`;
+
+  query += '## Confirmation Request\n';
+  query += 'Examine the above task tree. Determine if it is sufficient and accurate for the task description, summary, and rough plan. ';
+  query += 'Ensure the tree DOES NOT mention anything about environment setup or cloning the repo. ';
+  query += 'Ensure the tree DOES NOT mention anything about committing changes, deployment, code review, or documentation. ';
+  query += 'If it is sufficient, respond with an empty json object. If not, make edits where needed and provide a revised task tree. ';
+  query += 'Revised task trees must be complete and not reference the previous task tree.\n\n';
+  query += 'A revised task tree should: \n';
+  query += '- Include a list of steps to follow.\n';
+  query += '- Be extremely detailed in the descriptions.\n';
+  query += '- Include leaf nodes that are granular to the point of only requiring inserting code, replacing code, deleting code, or executing a terminal command (like npm commands, creating a new file, etc).\n';
+  query += '- Explicity mention whether code should be added, replaced, or deleted or if a terminal command is needed.\n';
+  query += '- Use json with the following recursive structure: {title: "", description: "", subtasks: []}.\n';
+
+  return query;
+}
+
 
 module.exports = {
   prepareInvestigationQuery,
@@ -189,5 +230,7 @@ module.exports = {
   prepareSummaryQuery,
   prepareSummaryConfirmationQuery,
   prepareRoughPlanQuery,
-  prepareRoughPlanConfirmationQuery
+  prepareRoughPlanConfirmationQuery,
+  prepareTaskTreeQuery,
+  prepareTaskTreeConfirmationQuery
 };

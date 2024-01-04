@@ -5,7 +5,7 @@ const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
 const { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm, generateAndConfirmSummaryWithLlm } = require('./repoAnalysis');
-const { generateRoughPlan } = require('./planner');
+const { generateRoughPlan, generateTaskTree } = require('./planner');
 const { prepareInvestigationQuery, prepareSummaryQuery } = require('./llmQueries');
 const { queryLlmWithJsonCheck } = require('./llmService');
 
@@ -114,11 +114,11 @@ router.post('/generate-plan', async (ctx) => {
     const roughPlan = await generateRoughPlan(taskDescription, summary);
     console.log('Rough plan:');
     console.log(roughPlan);
-    // TODO: Insert logic here to use GPT-4 to generate a task list based on the summary
-    // Example: const tasks = await generateTasksUsingGpt4(summary);
+
+    const taskTree = await generateTaskTree(taskDescription, summary, roughPlan);
 
     ctx.status = 200;
-    ctx.body = { message: 'Task list generated successfully', tasks: [] };
+    ctx.body = { message: 'Task list generated successfully', tasks: taskTree };
   } catch (error) {
     console.error('Error in /plan-api:', error.message);
     ctx.status = 500;
