@@ -109,7 +109,7 @@ router.post('/analyze-repo', async (ctx) => {
 
 router.post('/plan-api', async (ctx) => {
   try {
-    const { summary } = ctx.request.body;
+    const { taskDescription, repoUrl, summary } = ctx.request.body;
     // TODO: Insert logic here to use GPT-4 to generate a task list based on the summary
     // Example: const tasks = await generateTasksUsingGpt4(summary);
 
