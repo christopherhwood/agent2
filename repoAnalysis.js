@@ -153,11 +153,6 @@ async function generateAndConfirmSummaryWithLlm(summaryQuery, taskDescription, k
     return llmResponse.includes('ok') && llmResponse.length < 10;
   }
 
-  // Check if the initial summary response is already sufficient
-  if (isSummarySufficientFunction(summaryResponse)) {
-    return summaryResponse; // If the initial response is sufficient
-  }
-
   // Use iterateLlmQuery for the iterative confirmation process
   await iterateLlmQuery(initialConfirmationQuery, refineSummaryQueryFunction, isSummarySufficientFunction, systemPrompt, queryLlm);
   return summaryResponse;

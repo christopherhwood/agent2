@@ -5,6 +5,7 @@ const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
 const { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm, generateAndConfirmSummaryWithLlm } = require('./repoAnalysis');
+const { generateRoughPlan } = require('./planner');
 const { prepareInvestigationQuery, prepareSummaryQuery } = require('./llmQueries');
 const { queryLlmWithJsonCheck } = require('./llmService');
 
@@ -107,9 +108,12 @@ router.post('/analyze-repo', async (ctx) => {
   ctx.body = { summary: finalSummary, keyFiles, keyCommits };
 });
 
-router.post('/plan-api', async (ctx) => {
+router.post('/generate-plan', async (ctx) => {
   try {
     const { taskDescription, repoUrl, summary } = ctx.request.body;
+    const roughPlan = await generateRoughPlan(taskDescription, summary);
+    console.log('Rough plan:');
+    console.log(roughPlan);
     // TODO: Insert logic here to use GPT-4 to generate a task list based on the summary
     // Example: const tasks = await generateTasksUsingGpt4(summary);
 
@@ -141,4 +145,3 @@ function validateInvestigationResponse(jsonResponse) {
   }
   return jsonResponse;
 }
-  
