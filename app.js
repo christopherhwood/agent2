@@ -107,6 +107,20 @@ router.post('/analyze-repo', async (ctx) => {
   ctx.body = { summary: finalSummary, keyFiles, keyCommits };
 });
 
+router.post('/plan-api', async (ctx) => {
+  try {
+    const { summary } = ctx.request.body;
+    // TODO: Insert logic here to use GPT-4 to generate a task list based on the summary
+    // Example: const tasks = await generateTasksUsingGpt4(summary);
+
+    ctx.status = 200;
+    ctx.body = { message: 'Task list generated successfully', tasks: [], summary: '' };
+  } catch (error) {
+    console.error('Error in /plan-api:', error.message);
+    ctx.status = 500;
+    ctx.body = { error: 'Error processing your request' };
+  }
+});
 
 router.prefix('/api');
 
