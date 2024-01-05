@@ -1,8 +1,9 @@
-const { prepareTaskResolutionQuery } = require('./llmQueries.js');
-const { queryLlmWithTools } = require('./llmService.js');
+const { prepareTaskResolutionQuery, prepareTaskResolutionConfirmationQuery } = require('./llmQueries.js');
+const { queryLlmWithTools, iterateLlmQuery } = require('./llmService.js');
 const { createContainer, destroyContainer, executeCommand } = require('./dockerOperations.js');
 
-async function resolveTasks(topTask, keyFilesAndCommits, repoName) {
+async function resolveTasks(topTask, initialKeyFilesAndCommits, repoName) {
+  let keyFilesAndCommits = initialKeyFilesAndCommits;
   const coder = new Coder(repoName);
 
   const resolveTask = async (targetTask) => {
@@ -15,11 +16,15 @@ async function resolveTasks(topTask, keyFilesAndCommits, repoName) {
     console.log(response);
     // Execute response
     for (const toolCall of response) {
+      if (toolCall.function == 'pass') {
+        return;
+      }
       await coder.routeToolCall(toolCall);
     }
     // Confirm execution & response
+    await confirmTaskResolution(targetTask, topTask, getSystemPrompt(), coder);
     // Commit changes
-    await executeCommand(`git add . & git commit -m  "${targetTask.title}\n\n${targetTask.description}"`, repoName);
+    await executeCommand(`git add . && git commit -m  "${targetTask.title}\n\n${targetTask.description}"`, repoName);
     // Attach commit hash to task
     targetTask.commitHash = await executeCommand('git rev-parse HEAD', repoName);
     return;
@@ -30,6 +35,15 @@ async function resolveTasks(topTask, keyFilesAndCommits, repoName) {
       await resolveTask(task);
       task.title = '~' + task.title + '~';
       // Refresh keyFilesAndCommits
+      const keyFiles = keyFilesAndCommits.keyFiles;
+      for (const file of keyFiles) {
+        const blame = await executeCommand(`git --no-pager blame ${file.name}`, repoName);
+        const history = await executeCommand(`git --no-pager log -n 3 --pretty=format:"%h - %an, %ar : %s" -- ${file.name}`, repoName);
+        file.blame = blame;
+        file.history = history;
+      }
+      const keyCommits = executeCommand('git --no-pager log -n 5 --pretty-format:"%h - %an, %ar : %s"', repoName);
+      keyFilesAndCommits = { keyFiles: keyFiles, keyCommits: keyCommits };
       return;
     }
 
@@ -43,6 +57,47 @@ async function resolveTasks(topTask, keyFilesAndCommits, repoName) {
   // Start the resolution process from the root task
   await recursivelyResolveTasks(topTask);
 }
+
+async function confirmTaskResolution(targetTask, topTask, systemPrompt, coder) {
+  // Get a git diff and pass in with the task. Get back any functions & run them, then repeat until you get a pass or we hit 3 iterations.
+  // If we hit 3 iterations, revert the changes and return.
+
+  // Get a git diff
+  await coder.installDependencies();
+  let lint = await coder.lint();
+  let diff = await coder.gitDiff();
+  // Prepare the query to confirm the resolution
+  const query = prepareTaskResolutionConfirmationQuery(targetTask, topTask, {lint, diff});
+
+  async function refineTaskResolutionQuery(llmResponse, currentQuery) {
+    if (llmResponse[0].function !== 'pass') {
+      // Execute response
+      for (const toolCall of llmResponse) {
+        if (toolCall.function === 'pass') {
+          continue;
+        }
+        await coder.routeToolCall(toolCall);
+      }
+      lint = await coder.lint();
+      diff = await coder.gitDiff();
+    }
+    return prepareTaskResolutionConfirmationQuery(targetTask, topTask, {lint, diff});
+  }
+
+  function isTaskResolutionSufficientFunction(llmResponse) {
+    return llmResponse[0].function === 'pass';
+  }
+
+  const queryFunction = (messageHistory) => {
+    const tools = coder.getTools();
+    return queryLlmWithTools(messageHistory, tools);
+  };
+
+  // Use iterateLlmQuery for the iterative confirmation process
+  await iterateLlmQuery(query, refineTaskResolutionQuery, isTaskResolutionSufficientFunction, systemPrompt, queryFunction);
+  return diff;
+}
+  
 
 class Coder {
   constructor(repoName) {
@@ -62,10 +117,10 @@ class Coder {
     const container = await createContainer(this.repoName);
 
     // Echo the code to a temp file in the container
-    await executeCommand(`echo "${code}" > temp`, this.repoName, container);
+    await executeCommand(`echo "${code}" > /usr/src/temp`, this.repoName, container);
     
     // Insert the code into the specified file using the /usr/bin/insertCode.js script
-    await executeCommand(`/usr/bin/insertCode.js ${path} ${location.line} ${location.column} temp`, this.repoName, container);
+    await executeCommand(`/usr/bin/insertCode.js ${path} ${location.line} ${location.column} /usr/src/temp`, this.repoName, container);
     
     // Destroy the container
     await destroyContainer(container);
@@ -76,10 +131,10 @@ class Coder {
     const container = await createContainer(this.repoName);
 
     // Echo the code to a temp file in the container
-    await executeCommand(`echo "${code}" > temp`, this.repoName, container);
+    await executeCommand(`echo "${code}" > /usr/src/temp`, this.repoName, container);
     
     // Insert the code into the specified file using the /usr/bin/insertCode.js script
-    await executeCommand(`/usr/bin/replaceCode.js ${path} ${location.line} ${location.column} ${location.length} temp`, this.repoName, container);
+    await executeCommand(`/usr/bin/replaceCode.js ${path} ${location.line} ${location.column} ${location.length} /usr/src/temp`, this.repoName, container);
     
     // Destroy the container
     await destroyContainer(container);
@@ -95,12 +150,20 @@ class Coder {
     await executeCommand(command, this.repoName);
   }
 
-  async lint(file) {
-    await executeCommand(`eslint ${file}`, this.repoName);
+  async installDependencies() {
+    return await executeCommand('npm install', this.repoName);
   }
 
-  async runTests(file) {
-    await executeCommand(`jest ${file}`, this.repoName);
+  async lint() {
+    return await executeCommand('npm run lint', this.repoName);
+  }
+
+  async runTests() {
+    return await executeCommand('npm run test', this.repoName);
+  }
+
+  async gitDiff() {
+    return await executeCommand('git --no-pager diff', this.repoName);
   }
 
   getTools() {
@@ -266,6 +329,17 @@ class Coder {
               }
             },
             required: ['command']
+          }
+        }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'pass',
+          description: 'Passes the task without taking any action. Useful for tasks that do not require any action, such as tasks that are already completed or tasks that are not relevant to the current coding task. This is a no-op.',
+          parameters: {
+            type: 'object',
+            properties: {}
           }
         }
       }

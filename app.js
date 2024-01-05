@@ -111,7 +111,8 @@ router.post('/analyze-repo', async (ctx) => {
 
 router.post('/generate-plan', async (ctx) => {
   try {
-    const { taskDescription, repoUrl, summary } = ctx.request.body;
+    // taskDescription is string & summary is json object
+    const { taskDescription, summary } = ctx.request.body;
     const roughPlan = await generateRoughPlan(taskDescription, summary);
     console.log('Rough plan:');
     console.log(roughPlan);
@@ -129,8 +130,12 @@ router.post('/generate-plan', async (ctx) => {
 
 router.post('/resolve-tasks', async (ctx) => {
   try {
+    // task is json object & keyFilesAndCommits is json object & repoUrl is string
     const { task, keyFilesAndCommits, repoUrl } = ctx.request.body;
     const repoName = extractRepoName(repoUrl);
+    // This is a hack for now:
+    await executeCommand('git config user.name "qckfx Agent"', repoName);
+    await executeCommand('git config user.email "chris.wood@earlyworm.io"', repoName);
     // Checkout new branch
     await executeCommand('git checkout -b agent-1', repoName);
     // Resolve tasks

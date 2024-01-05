@@ -43,15 +43,14 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse) {
   console.log('messages:');
   console.log(messages);
   try {
-    const request = {
+    const response = await openai.chat.completions.create({
       model: 'gpt-4-1106-preview',
       messages: messages,
       max_tokens: 4096,
       temperature: 0,
       top_p: 1,
       response_format: {type: 'json_object'}
-    };
-    const response = await openai.chat.completions.create();
+    });
 
     let jsonResponse;
     try {

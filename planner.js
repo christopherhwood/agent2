@@ -8,7 +8,7 @@ async function generateRoughPlan(taskDescription, summary) {
   
   Format your response as a structured list of steps, each step thoroughly detailed to guide the implementation process. Pay attention to technical specifics, project-specific nuances, and user interface and experience considerations to ensure the plan is not only theoretically sound but also practically applicable and user-friendly. Your output should serve as a comprehensive guide for developers to execute the task seamlessly, respecting the established patterns and standards of the existing codebase, while prioritizing the needs and satisfaction of the end user.`;
 
-  const query = prepareRoughPlanQuery(taskDescription, summary);
+  const query = prepareRoughPlanQuery(taskDescription, JSON.stringify(summary));
   const response = await queryLlm([{role: 'system', content: systemPrompt}, {role: 'user', content: query}]);
 
   // Confirm response
@@ -19,13 +19,13 @@ async function generateRoughPlan(taskDescription, summary) {
 async function confirmRoughPlanWithLlm(roughPlan, taskDescription, summary, systemPrompt) {
   let currentRoughPlan = roughPlan;
   // Prepare the query to confirm the rough plan
-  const initialConfirmationQuery = prepareRoughPlanConfirmationQuery(roughPlan, taskDescription, summary);
+  const initialConfirmationQuery = prepareRoughPlanConfirmationQuery(roughPlan, taskDescription, JSON.stringify(summary));
 
   async function refineRoughPlanQueryFunction(llmResponse, currentQuery) {
     if (!llmResponse.includes('ok') && llmResponse.length < 10) {
       currentRoughPlan = llmResponse;
     }
-    return prepareRoughPlanConfirmationQuery(llmResponse, taskDescription, summary);
+    return prepareRoughPlanConfirmationQuery(llmResponse, taskDescription, JSON.stringify(summary));
   }
 
   function isRoughPlanSufficientFunction(llmResponse) {
@@ -46,7 +46,7 @@ async function generateTaskTree(taskDescription, summary, roughPlan) {
   Each leaf task in the tree must be detailed, specifying the exact action needed, and should be as atomic as possible, aiming for clarity and precision. Avoid including preliminary setup tasks such as environment setup, repo cloning, or post-completion tasks like committing changes, deployment, code review, documentation, or monitoring in production. Instead, focus the tree on the core development activities that directly contribute to the task's completion.
   
   Your output should be a clear, structured JSON object representing the entire task tree, ready to guide developers through the task with efficiency and clarity.`;
-  const query = prepareTaskTreeQuery(taskDescription, summary, roughPlan);
+  const query = prepareTaskTreeQuery(taskDescription, JSON.stringify(summary), roughPlan);
   const response = await queryLlmWithJsonCheck([{role: 'system', content: systemPrompt}, {role: 'user', content: query}]);
 
   // Confirm response
@@ -57,13 +57,13 @@ async function generateTaskTree(taskDescription, summary, roughPlan) {
 async function confirmTaskTreeWithLlm(taskTree, taskDescription, summary, roughPlan, systemPrompt) {
   let currentTaskTree = taskTree;
   // Prepare the query to confirm the rough plan
-  const initialConfirmationQuery = prepareTaskTreeConfirmationQuery(taskTree, taskDescription, summary, roughPlan);
+  const initialConfirmationQuery = prepareTaskTreeConfirmationQuery(taskTree, taskDescription, JSON.stringify(summary), roughPlan);
 
   async function refineTaskTreeQueryFunction(llmResponse, currentQuery) {
     if (llmResponse != {}) {
       currentTaskTree = llmResponse;
     }
-    return prepareTaskTreeConfirmationQuery(llmResponse, taskDescription, summary, roughPlan);
+    return prepareTaskTreeConfirmationQuery(llmResponse, taskDescription, JSON.stringify(summary), roughPlan);
   }
 
   function isTaskTreeSufficientFunction(llmResponse) {
