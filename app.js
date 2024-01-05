@@ -2,7 +2,7 @@ require('dotenv').config();  // Ensure environment variables are loaded
 const Koa = require('koa');
 const Router = require('@koa/router');
 const { koaBody } = require('koa-body');
-const { cloneRepositoryInContainer } = require('./dockerOperations');
+const { cloneRepositoryInContainer, executeCommand } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
 const { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm, generateAndConfirmSummaryWithLlm } = require('./repoAnalysis');
 const { generateRoughPlan, generateTaskTree } = require('./planner');
@@ -132,6 +132,7 @@ router.post('/resolve-tasks', async (ctx) => {
     const { task, keyFilesAndCommits, repoUrl } = ctx.request.body;
     const repoName = extractRepoName(repoUrl);
     // Checkout new branch
+    await executeCommand('git checkout -b agent-1', repoName);
     // Resolve tasks
     const resolvedTasks = await resolveTasks(task, keyFilesAndCommits, repoName);
     // Submit PR
