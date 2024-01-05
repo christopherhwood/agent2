@@ -21,7 +21,7 @@ async function confirmRoughPlanWithLlm(roughPlan, taskDescription, summary, syst
   // Prepare the query to confirm the rough plan
   const initialConfirmationQuery = prepareRoughPlanConfirmationQuery(roughPlan, taskDescription, JSON.stringify(summary));
 
-  async function refineRoughPlanQueryFunction(llmResponse, currentQuery) {
+  async function refineRoughPlanQueryFunction(llmResponse) {
     if (!llmResponse.includes('ok') && llmResponse.length < 10) {
       currentRoughPlan = llmResponse;
     }
@@ -59,7 +59,7 @@ async function confirmTaskTreeWithLlm(taskTree, taskDescription, summary, roughP
   // Prepare the query to confirm the rough plan
   const initialConfirmationQuery = prepareTaskTreeConfirmationQuery(taskTree, taskDescription, JSON.stringify(summary), roughPlan);
 
-  async function refineTaskTreeQueryFunction(llmResponse, currentQuery) {
+  async function refineTaskTreeQueryFunction(llmResponse) {
     if (llmResponse != {}) {
       currentTaskTree = llmResponse;
     }

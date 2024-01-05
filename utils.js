@@ -1,5 +1,4 @@
 const fs = require('fs');
-const path = require('path');
 
 const dockerRepoPath = '/var/qckfx/repos';
 const fallbackDockerRepoPath = '~/repos';

@@ -69,7 +69,7 @@ async function confirmTaskResolution(targetTask, topTask, systemPrompt, coder) {
   // Prepare the query to confirm the resolution
   const query = prepareTaskResolutionConfirmationQuery(targetTask, topTask, {lint, diff});
 
-  async function refineTaskResolutionQuery(llmResponse, currentQuery) {
+  async function refineTaskResolutionQuery(llmResponse) {
     if (llmResponse[0].function !== 'pass') {
       // Execute response
       for (const toolCall of llmResponse) {

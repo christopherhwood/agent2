@@ -37,7 +37,6 @@ function deleteCode(path, location) {
 // Prepare for deletion of the code
 function prepareForCodeDeletion(location, lines) {
   const startLineIndex = location.line - 1;
-  const endLineIndex = startLineIndex + location.length;
 
   // Remove the specified range of lines
   lines.splice(startLineIndex, location.length);

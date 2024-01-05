@@ -83,7 +83,7 @@ async function fetchInvestigationData(gptResponse, repoName) {
 async function confirmInvestigationDataWithLlm(taskDescription, initialContext, investigationData, repoName, systemPrompt) {
   let currentInvestigationData = investigationData;
 
-  async function refineInvestigationQuery(llmResponse, currentQuery) {
+  async function refineInvestigationQuery(llmResponse) {
     if (llmResponse.files.length > 0 || llmResponse.commits.length > 0) {
       const additionalData = await fetchInvestigationData(llmResponse, repoName);
       currentInvestigationData = mergeInvestigationData(currentInvestigationData, additionalData);
@@ -141,7 +141,7 @@ async function generateAndConfirmSummaryWithLlm(summaryQuery, taskDescription, k
   // Prepare the query to confirm the summary
   const initialConfirmationQuery = prepareSummaryConfirmationQuery(summaryResponse, taskDescription, keyFiles, keyCommits);
 
-  async function refineSummaryQueryFunction(llmResponse, currentQuery) {
+  async function refineSummaryQueryFunction(llmResponse) {
     if (!llmResponse.includes('ok') && llmResponse.length < 10) {
       summaryResponse = llmResponse;
     }
