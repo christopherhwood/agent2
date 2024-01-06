@@ -84,15 +84,13 @@ async function confirmInvestigationDataWithLlm(taskDescription, initialContext, 
   let currentInvestigationData = investigationData;
 
   async function refineInvestigationQuery(llmResponse) {
-    if (llmResponse.files.length > 0 || llmResponse.commits.length > 0) {
-      const additionalData = await fetchInvestigationData(llmResponse, repoName);
-      currentInvestigationData = mergeInvestigationData(currentInvestigationData, additionalData);
-    }
+    currentInvestigationData = llmResponse;
     return prepareConfirmationQuery(taskDescription, initialContext, currentInvestigationData);
   }
 
   function isInvestigationDataSufficient(llmResponse) {
-    return llmResponse.files.length === 0 && llmResponse.commits.length === 0 || isSubsetOfCurrentData(llmResponse, currentInvestigationData);
+    // Stop when the llm returns the same data as the current data
+    return isEqualToCurrentData(llmResponse, currentInvestigationData);
   }
 
   const initialQuery = prepareConfirmationQuery(taskDescription, initialContext, investigationData);
@@ -203,21 +201,22 @@ async function executeCommandInContainer(container, command) {
   });
 }
 
+// Checks if the LLM response is exactly equal to the current data
+function isEqualToCurrentData(llmResponse, currentData) {
+  if (llmResponse.files.length !== currentData.files.length || llmResponse.commits.length !== currentData.commits.length) {
+    return false;
+  }
 
-function mergeInvestigationData(existingData, additionalData) {
-  const mergedFiles = [...new Set([...existingData.files, ...additionalData.files])];
-  const mergedCommits = [...new Set([...existingData.commits, ...additionalData.commits])];
-
-  return { files: mergedFiles, commits: mergedCommits };
+  for (const file of llmResponse.files) {
+    if (!currentData.files.filter(f => f.name === file.name).length) {
+      return false;
+    }
+  }
+  for (const commit of llmResponse.commits) {
+    if (!currentData.commits.filter(c => c.hash === commit.hash).length) {
+      return false;
+    }
+  }
 }
-
-function isSubsetOfCurrentData(llmResponse, currentData) {
-  const allFiles = new Set(currentData.files.map(file => file.name));
-  const allCommits = new Set(currentData.commits.map(commit => commit.hash));
-
-  return llmResponse.files.every(file => allFiles.has(file)) &&
-         llmResponse.commits.every(commit => allCommits.has(commit));
-}
-
 
 module.exports = { getInitialContext, fetchInvestigationData, confirmInvestigationDataWithLlm, generateAndConfirmSummaryWithLlm };

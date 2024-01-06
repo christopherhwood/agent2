@@ -66,8 +66,8 @@ function prepareConfirmationQuery(taskDescription, context, investigationData) {
   query += '## Confirmation\n';
   query += 'Is this information sufficient to complete the task? ';
   query += 'If not, what additional files or commits should be investigated? ';
+  query += 'Are any of the included files or commits unnecessary? If so, remove them from the list. ';
   query += 'Please respond in JSON format with `{files: [], commits: []}`. ';
-  query += 'If no additional files or commits are needed, respond with `{files: [], commits: []}`.';
 
   return query;
 }
