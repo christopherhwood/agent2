@@ -84,7 +84,7 @@ async function confirmInvestigationDataWithLlm(taskDescription, initialContext, 
   let currentInvestigationData = investigationData;
 
   async function refineInvestigationQuery(llmResponse) {
-    currentInvestigationData = llmResponse;
+    const currentInvestigationData = await fetchInvestigationData(llmResponse, repoName);
     return prepareConfirmationQuery(taskDescription, initialContext, currentInvestigationData);
   }
 
@@ -208,12 +208,12 @@ function isEqualToCurrentData(llmResponse, currentData) {
   }
 
   for (const file of llmResponse.files) {
-    if (!currentData.files.filter(f => f.name === file.name).length) {
+    if (!currentData.files.filter(f => f.name === file).length) {
       return false;
     }
   }
   for (const commit of llmResponse.commits) {
-    if (!currentData.commits.filter(c => c.hash === commit.hash).length) {
+    if (!currentData.commits.filter(c => c.hash === commit).length) {
       return false;
     }
   }
