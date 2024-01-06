@@ -111,7 +111,7 @@ function prepareSummaryQuery(taskDescription, keyFiles, keyCommits) {
 }
 
 function prepareSummaryConfirmationQuery(summary, taskDescription, keyFiles, keyCommits) {
-  let query = `## Summary for Confirmation\n${summary}\n\n`;
+  let query = `## Summary for Revision\n${summary}\n\n`;
   query += `## Task Description\n${taskDescription}\n\n`;
 
   // Include detailed information about key files
@@ -131,11 +131,10 @@ function prepareSummaryConfirmationQuery(summary, taskDescription, keyFiles, key
     query += `  - **Commit Details:**\n\`\`\`\n${commit.details}\n\`\`\`\n`;
   });
 
-  query += '## Confirmation Request\n';
-  query += 'Examine the above summary. Determine if it is sufficient and accurate for the task description and the key investigation data. ';
-  query += 'If it is sufficient, respond with "ok". If not, make edits where needed and provide a revised summary.';
-  query += 'Revised summaries must be complete and not reference the previous summary.\n\n';
-  query += 'DO NOT say things like "The provided summary is...". Instead, just provide the revised summary.';
+  query += '## Revision Request\n';
+  query += 'Examine the above summary. Determine if it needs revisions to be sufficient and accurate for the task description and the key investigation data. ';
+  query += 'If it is sufficient, respond with just "ok". If not, make edits where needed and provide a full, complete revised summary.';
+  query += 'Revised summaries will overwrite previous summaries, and as such they must not refer to previous summary contents in any way.\n\n';
   query += 'A revised summary should: \n';
   query += '- Focus on the relevance of the identified files and commits to the task.\n';
   query += '- Include code snippets and commit hashes where relevant for context.\n';
@@ -250,7 +249,7 @@ function prepareTaskResolutionQuery(targetTask, rootTask, keyFilesAndCommits) {
   };
   buildTaskTree(0, rootTask);
   
-  query += `# Key Files & Commits\n${JSON.stringify(keyFilesAndCommits)}\n\n`;
+  query += `# Key Files & Commits\n${keyFilesAndCommits}\n\n`;
   query += '# Request\n';
   query += 'Use the tools at your disposal to resolve the above task. ';
   query += 'Focus on the task tagged as TODO. If no changes are required, use the pass function in your tools. ';
@@ -258,7 +257,7 @@ function prepareTaskResolutionQuery(targetTask, rootTask, keyFilesAndCommits) {
   return query;
 }
 
-function prepareTaskResolutionConfirmationQuery(targetTask, rootTask, context) {
+function prepareTaskResolutionConfirmationQuery(targetTask, rootTask, keyFilesAndCommits, context) {
   let query = '# Task\n';
   const buildTaskTree = (level, task) => {
     // Build a query like: 
@@ -288,6 +287,7 @@ function prepareTaskResolutionConfirmationQuery(targetTask, rootTask, context) {
   for (const key of Object.keys(context)) {
     query += `# ${key[0].toUpperCase() + key.slice(1)}\n\`\`\`\n${context[key]}\n\`\`\`\n\n`;
   }
+  query += `# Key Files & Commits (prior to the diff above)\n${keyFilesAndCommits}\n\n`;
   query += '# Request\n';
   query += 'Examine the above task and git diff. Determine if the task is complete and the git diff is accurate. ';
   query += 'If the task is complete and the git diff is accurate, use the pass function in your tools. If not, use the tools at your disposal to resolve the task. ';

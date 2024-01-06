@@ -72,7 +72,7 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse) {
   }
 }
 
-async function queryLlmWithTools(messages, tools) {
+async function queryLlmWithTools(messages, tools, tries = 0) {
   console.log('messages:');
   console.log(messages);
   console.log('tools:');
@@ -88,12 +88,17 @@ async function queryLlmWithTools(messages, tools) {
       tool_choice: 'auto'
     });
 
+    console.log('Message Content: ' + response.choices[0].message.content);
     let toolCalls = response.choices[0].message.tool_calls;
     try {
       validateToolCalls(toolCalls, tools);
     } catch (error) {
       console.error('Error validating tool calls:', error);
-      throw error;
+      if (tries < 3) {
+        return await queryLlmWithTools([...messages, {role: 'assistant', content: JSON.stringify({content: response.choices[0].message.content, tool_calls: response.choices[0].message.tool_calls})}, {role: 'user', content: 'You must correctly use the tools provided. You must use at least one tool in your response.'}], tools, tries + 1);
+      } else {
+        throw error;
+      }
     } 
 
     toolCalls = toolCalls.map(toolCall => {
@@ -206,6 +211,10 @@ function validateToolCalls(toolCalls, tools) {
     }
     // Validate that the required properties are present
     const toolParameters = tool.function.parameters.required;
+    if (!toolParameters) {
+      return true; // No required parameters
+    }
+
     const toolCallParameters = JSON.parse(toolCall.function.arguments);
     for (const parameter of toolParameters) {
       if (!toolCallParameters[parameter]) {

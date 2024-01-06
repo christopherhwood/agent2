@@ -1,61 +1,43 @@
 #!/usr/local/bin/node
 
 const fs = require('fs');
-const os = require('os');
 const pathModule = require('path');
 
 // Parse command-line arguments
 const args = process.argv.slice(2);
-const [relativePath, line, column, length, codeFile] = args;
+const [relativePath, originalSnippetPath, newCodeFile] = args;
 
 // Resolve the absolute path from the relative path
 const absolutePath = pathModule.resolve(process.cwd(), relativePath);
 
-// Convert line, column, and length to numbers
-const location = {
-  line: parseInt(line, 10),
-  column: parseInt(column, 10),
-  length: parseInt(length, 10)
-};
-
-// Read the new code from the provided code file
-const newCode = fs.readFileSync(codeFile, 'utf8');
+// Read the original and new code snippets
+const originalSnippet = fs.readFileSync(originalSnippetPath, 'utf8').trim();
+const newCode = fs.readFileSync(newCodeFile, 'utf8').trim();
 
 // Replace code function
-function replaceCode(path, location, newCode) {
+function replaceCode(path, originalSnippet, newCode) {
   // Read the original file
   const fileContent = fs.readFileSync(path, 'utf8');
-  const lines = fileContent.split(os.EOL);
+  
+  // Check if the original snippet exists in the file
+  if (!fileContent.includes(originalSnippet)) {
+    console.error('Error: Original code snippet does not exist.');
+    process.exit(1);
+  }
 
-  // Prepare the new code for replacement
-  const preparedNewCode = prepareCodeForReplacement(newCode, location, lines);
+  // Replace the original snippet with the new code
+  const updatedContent = fileContent.replace(originalSnippet, newCode);
 
   // Write the modified content back to the file
-  fs.writeFileSync(path, preparedNewCode.join(os.EOL));
+  fs.writeFileSync(path, updatedContent);
 
   // Log the modified content
-  console.log(preparedNewCode.join(os.EOL));
-}
-
-// Prepare code for replacement
-function prepareCodeForReplacement(newCode, location, lines) {
-  const startLineIndex = location.line - 1;
-  const endLineIndex = startLineIndex + location.length;
-  
-  // Extract the portion of the file to be replaced
-  const before = lines.slice(0, startLineIndex);
-  const after = lines.slice(endLineIndex);
-
-  // Split the new code into lines
-  const newCodeLines = newCode.split(os.EOL);
-
-  // Combine the file parts with the new code
-  return [...before, ...newCodeLines, ...after];
+  console.log(updatedContent);
 }
 
 try {
   // Execute the replaceCode function
-  replaceCode(absolutePath, location, newCode);
+  replaceCode(absolutePath, originalSnippet, newCode);
 } catch (err) {
   console.error('Error replacing code:', err);
 }

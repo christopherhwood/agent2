@@ -63,8 +63,8 @@ async function fetchInvestigationData(gptResponse, repoName) {
 
     // Fetch data for each identified commit
     for (const commitHash of commits) {
-      const commitDetails = await executeCommandInContainer(container, `git -C /repo show ${commitHash}`);
-      commitsData.push({ hash: commitHash, details: commitDetails });
+      const commitDetails = await executeCommandInContainer(container, `git -C /repo show ${commitHash.substring(0, 7)}`);
+      commitsData.push({ hash: commitHash.substring(0, 7), details: commitDetails });
     }
 
     return { files: filesData, commits: commitsData };
