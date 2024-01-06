@@ -84,7 +84,20 @@ async function confirmInvestigationDataWithLlm(taskDescription, initialContext, 
   let currentInvestigationData = investigationData;
 
   async function refineInvestigationQuery(llmResponse) {
-    const currentInvestigationData = await fetchInvestigationData(llmResponse, repoName);
+    // Fetch investigation data for files or commits not already in the current data
+    const newFiles = llmResponse.files.filter(f => !currentInvestigationData.files.filter(f2 => f2.name === f).length);
+    const newCommits = llmResponse.commits.filter(c => !currentInvestigationData.commits.filter(c2 => c2.hash === c).length);
+    const newInvestigationData = await fetchInvestigationData({ files: newFiles, commits: newCommits }, repoName);
+
+    // Remove data for files or commits not listed in the new llmResponse
+    const filteredFiles = currentInvestigationData.files.filter(f => llmResponse.files.includes(f.name));
+    const filteredCommits = currentInvestigationData.commits.filter(c => llmResponse.commits.includes(c.hash));
+
+    // Merge new data with filtered data
+    currentInvestigationData = {
+      files: [...filteredFiles, ...newInvestigationData.files],
+      commits: [...filteredCommits, ...newInvestigationData.commits]
+    };
     return prepareConfirmationQuery(taskDescription, initialContext, currentInvestigationData);
   }
 

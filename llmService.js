@@ -36,10 +36,11 @@ async function queryLlm(messages) {
  * @param {[object]} messages - The message history to send to GPT-4, formatted as an array of objects with 'role' and 'content'.
  * @param {function} validateJsonResponse - A function to dynamically validate and possibly modify the JSON response. 
  * This function should take a JSON object as input and return a validated/modified JSON object.
+ * @param {number} tries - The number of times the query has been attempted.
  * @returns {object} - The validated and possibly modified JSON response from GPT-4.
  * @throws Will throw an error if the response is not in valid JSON format or if the validation function finds issues.
  */
-async function queryLlmWithJsonCheck(messages, validateJsonResponse) {
+async function queryLlmWithJsonCheck(messages, validateJsonResponse, tries = 0) {
   console.log('messages:');
   console.log(messages);
   try {
@@ -57,6 +58,9 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse) {
       jsonResponse = JSON.parse(response.choices[0].message.content);
     } catch (jsonError) {
       console.error('Error parsing JSON response from LLM:', jsonError);
+      if (tries < 3) {
+        return await queryLlmWithJsonCheck([...messages, {role: 'assistant', content: JSON.stringify({content: response.choices[0].message.content})}, {role: 'user', content: 'You must provide a valid JSON response.'}], validateJsonResponse, tries + 1);
+      }
       throw new Error('Received ill-formatted JSON response from LLM.');
     }
 
