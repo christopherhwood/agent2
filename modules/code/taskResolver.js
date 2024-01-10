@@ -1,12 +1,15 @@
 
 const { prepareTaskResolutionQuery, prepareTaskResolutionConfirmationQuery } = require('./llmQueries');
 const { queryLlmWithTools, iterateLlmQuery } = require('../../llmService');
+const { generateSummary } = require('../summary');
 const { CoderSystemPrompt, CodeReviewerSystemPrompt } = require('./systemPrompts');
 
 async function resolveTask(targetTask, coder) {
   const tools = coder.getTools();
+  // Get important code for the leaf task.
+  const summary = await generateSummary(coder.repoName, targetTask.title + ' - ' + targetTask.description);
   // Prepare the query to resolve the task
-  const query = prepareTaskResolutionQuery(targetTask, coder.rootTask, coder.fileCodeMap);
+  const query = prepareTaskResolutionQuery(targetTask, coder.rootTask, summary.summary, summary.fileCodeMap);
   const response = await queryLlmWithTools([{role: 'system', content: CoderSystemPrompt}, {role: 'user', content: query}], tools);
   console.log('Response from LLM:');
   console.log(response);
@@ -44,7 +47,7 @@ async function recursivelyResolveTasks(task, coder) {
   return;
 }
 
-async function confirmTaskResolution(targetTask, topTask, systemPrompt, coder) {
+async function confirmTaskResolution(targetTask, topTask, systemPrompt, summary, coder) {
   // Get a git diff and pass in with the task. Get back any functions & run them, then repeat until you get a pass or we hit 3 iterations.
   // If we hit 3 iterations, revert the changes and return.
 
@@ -53,7 +56,7 @@ async function confirmTaskResolution(targetTask, topTask, systemPrompt, coder) {
   let lint = await coder.lint();
   let diff = await coder.gitDiff();
   // Prepare the query to confirm the resolution
-  const query = prepareTaskResolutionConfirmationQuery(targetTask, topTask, coder.fileCodeMap, {lint, diff});
+  const query = prepareTaskResolutionConfirmationQuery(targetTask, topTask, summary.summary, summary.fileCodeMap, {lint, diff});
 
   async function refineTaskResolutionQuery(llmResponse) {
     if (llmResponse[0].function !== 'pass') {

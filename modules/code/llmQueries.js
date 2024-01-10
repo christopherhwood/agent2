@@ -1,4 +1,4 @@
-function prepareTaskResolutionQuery(targetTask, rootTask, fileCodeMap) {
+function prepareTaskResolutionQuery(targetTask, rootTask, summary, fileCodeMap) {
   let query = '# Task\n';
   const buildTaskTree = (level, task) => {
     // Build a query like: 
@@ -24,6 +24,9 @@ function prepareTaskResolutionQuery(targetTask, rootTask, fileCodeMap) {
     return true;
   };
   buildTaskTree(0, rootTask);
+
+  query += '# Summary of existing code\n';
+  query += summary + '\n\n';
   
   query += '# Key Code Snippets\n\n';
   for (const fileName of Object.keys(fileCodeMap)) {
@@ -39,7 +42,7 @@ function prepareTaskResolutionQuery(targetTask, rootTask, fileCodeMap) {
   return query;
 }
 
-function prepareTaskResolutionConfirmationQuery(targetTask, rootTask, fileCodeMap, context) {
+function prepareTaskResolutionConfirmationQuery(targetTask, rootTask, summary, fileCodeMap, context) {
   let query = '# Task\n';
   const buildTaskTree = (level, task) => {
     // Build a query like: 
@@ -69,6 +72,10 @@ function prepareTaskResolutionConfirmationQuery(targetTask, rootTask, fileCodeMa
   for (const key of Object.keys(context)) {
     query += `# ${key[0].toUpperCase() + key.slice(1)}\n\`\`\`\n${context[key]}\n\`\`\`\n\n`;
   }
+
+  query += '# Summary of existing code\n';
+  query += summary + '\n\n';
+  
   query += '# Key Code Snippets (prior to diff above)\n\n';
   for (const fileName of Object.keys(fileCodeMap)) {
     query += `## ${fileName}\n`;
