@@ -21,7 +21,7 @@ async function resolveTask(targetTask, coder) {
     await coder.routeToolCall(toolCall);
   }
   // Confirm execution & response
-  await confirmTaskResolution(targetTask, coder.rootTask, CodeReviewerSystemPrompt, coder);
+  await confirmTaskResolution(targetTask, coder.rootTask, CodeReviewerSystemPrompt, summary, coder);
   // Commit changes
   await coder.commitChanges(targetTask);
   return;
