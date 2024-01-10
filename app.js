@@ -4,9 +4,9 @@ const Router = require('@koa/router');
 const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer, executeCommand } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
-const { prepareSummary } = require('./repoAnalysis');
-const { generateRoughPlan, generateTaskTree } = require('./planner');
-const { resolveTasks } = require('./coder');
+const { generateSummary } = require('./modules/summary');
+const { generatePlan } = require('./modules/plan');
+const { resolveTasks } = require('./modules/code');
 
 setupDockerDirectory();
 
@@ -61,11 +61,8 @@ router.post('/clone-repo', async (ctx) => {
 
 router.post('/analyze-repo', async (ctx) => {
   const { taskDescription, gitRepoUrl } = ctx.request.body;
-
   const repoName = extractRepoName(gitRepoUrl);
-
-  const summary = await prepareSummary(repoName, taskDescription);
-
+  const summary = await generateSummary(repoName, taskDescription);
   ctx.body = { message: 'Repo analysis completed successfully', summary: summary };
 });
 
@@ -73,12 +70,7 @@ router.post('/generate-plan', async (ctx) => {
   try {
     // taskDescription is string & summary is json object
     const { taskDescription, summary } = ctx.request.body;
-    const roughPlan = await generateRoughPlan(taskDescription, summary);
-    console.log('Rough plan:');
-    console.log(roughPlan);
-
-    const taskTree = await generateTaskTree(taskDescription, summary, roughPlan);
-
+    const taskTree = await generatePlan(taskDescription, summary);
     ctx.status = 200;
     ctx.body = { message: 'Task list generated successfully', tasks: taskTree };
   } catch (error) {
@@ -90,8 +82,8 @@ router.post('/generate-plan', async (ctx) => {
 
 router.post('/resolve-tasks', async (ctx) => {
   try {
-    // task is json object & keyFilesAndCommits is json object & repoUrl is string
-    const { task, keyFilesAndCommits, repoUrl } = ctx.request.body;
+    // task is json object & fileCodeMap is json object & repoUrl is string
+    const { task, fileCodeMap, repoUrl } = ctx.request.body;
     const repoName = extractRepoName(repoUrl);
     // This is a hack for now:
     await executeCommand('git config user.name "qckfx Agent"', repoName);
@@ -99,7 +91,7 @@ router.post('/resolve-tasks', async (ctx) => {
     // Checkout new branch
     await executeCommand('git checkout -b agent-1', repoName);
     // Resolve tasks
-    const resolvedTasks = await resolveTasks(task, keyFilesAndCommits, repoName);
+    const resolvedTasks = await resolveTasks(task, fileCodeMap, repoName);
     // Submit PR
     ctx.status = 200;
     ctx.body = { message: 'Tasks resolved successfully', tasks: resolvedTasks };
