@@ -5,11 +5,7 @@ const { FilePickerSystemPrompt, FunctionPickerSystemPrompt } = require('./system
 
 async function pickImportantCodeFromRepoForTask(repoName, taskDescription) {
   // 1. Get directory tree & recent commits
-  const context = await getInitialContext(repoName); 
-  
-  // 2. & 3. Get and fetch investigation suggestions
-  const fileSelectionQuery = prepareFileSelectionQuery(taskDescription, context);
-  let fileNames = await queryLlmWithJsonCheck([{role: 'system', content: FilePickerSystemPrompt}, {role: 'user', content: fileSelectionQuery}], validateFileSelectionResponse);
+  let fileNames = await selectKeyFiles(repoName, taskDescription);
   console.log('key files:');
   console.log(fileNames);
 
@@ -48,6 +44,16 @@ async function pickImportantCodeFromRepoForTask(repoName, taskDescription) {
   }
 
   return fileCodeMap;  
+}
+
+async function selectKeyFiles(repoName, taskDescription) {
+  // 1. Get directory tree & recent commits
+  const context = await getInitialContext(repoName); 
+
+  // 2. & 3. Get and fetch investigation suggestions
+  const fileSelectionQuery = prepareFileSelectionQuery(taskDescription, context);
+  let fileNames = await queryLlmWithJsonCheck([{role: 'system', content: FilePickerSystemPrompt}, {role: 'user', content: fileSelectionQuery}], validateFileSelectionResponse);
+  return fileNames;
 }
 
 async function getImportantFunctionsFromFiles(taskDescription, repoName, fileNames) {
@@ -108,4 +114,4 @@ function validateImportantFunctionResponse(jsonResponse) {
   return jsonResponse;
 }
 
-module.exports = { pickImportantCodeFromRepoForTask, getImportantFunctionsFromFiles };
+module.exports = { selectKeyFiles, pickImportantCodeFromRepoForTask, getImportantFunctionsFromFiles };

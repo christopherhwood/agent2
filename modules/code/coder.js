@@ -70,7 +70,7 @@ class Coder {
   }
 
   async executeCommand(command) {
-    await executeCommand(command, this.repoName);
+    return await executeCommand(command, this.repoName);
   }
 
   async installDependencies() {

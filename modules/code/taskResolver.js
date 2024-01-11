@@ -1,7 +1,7 @@
 
 const { prepareTaskResolutionQuery, prepareTaskResolutionConfirmationQuery } = require('./llmQueries');
+const { selectKeyFiles } = require('../summary/codePicker');
 const { queryLlmWithTools, iterateLlmQuery } = require('../../llmService');
-const { generateSummary } = require('../summary');
 const { CoderSystemPrompt, CodeReviewerSystemPrompt } = require('./systemPrompts');
 
 async function resolveTask(targetTask, coder) {
@@ -32,9 +32,18 @@ async function resolveTask(targetTask, coder) {
     return true;
   };
   buildTaskTree(0, coder.rootTask);
-  const summary = await generateSummary(coder.repoName, taskString);
+
+  let fileContents = {};
+  const keyFiles = await selectKeyFiles(coder.repoName, taskString);
+  for (const fileName in keyFiles) {
+    try {
+      fileContents[fileName] = await coder.executeCommand(`cat ${fileName}`);
+    } catch (err) {
+      console.log(`Failed to cat ${fileName}`, err);
+    }
+  }
   // Prepare the query to resolve the task
-  const query = prepareTaskResolutionQuery(taskString, summary.summary, summary.fileCodeMap);
+  const query = prepareTaskResolutionQuery(taskString, fileContents);
   const response = await queryLlmWithTools([{role: 'system', content: CoderSystemPrompt}, {role: 'user', content: query}], tools);
   console.log('Response from LLM:');
   console.log(response);
@@ -45,8 +54,18 @@ async function resolveTask(targetTask, coder) {
     }
     await coder.routeToolCall(toolCall);
   }
+
+  // update file contents
+  for (const fileName in fileContents) {
+    try {
+      fileContents[fileName] = await coder.executeCommand(`cat ${fileName}`);
+    } catch (err) {
+      console.log(`Failed to cat ${fileName}`, err);
+    }
+  }
+
   // Confirm execution & response
-  await confirmTaskResolution(taskString, CodeReviewerSystemPrompt, summary, coder);
+  await confirmTaskResolution(taskString, CodeReviewerSystemPrompt, fileContents, coder);
   // Commit changes
   await coder.commitChanges(targetTask);
   return;
@@ -72,16 +91,17 @@ async function recursivelyResolveTasks(task, coder) {
   return;
 }
 
-async function confirmTaskResolution(taskString, systemPrompt, summary, coder) {
+async function confirmTaskResolution(taskString, systemPrompt, originalFileContents, coder) {
   // Get a git diff and pass in with the task. Get back any functions & run them, then repeat until you get a pass or we hit 3 iterations.
   // If we hit 3 iterations, revert the changes and return.
 
+  let fileContents = originalFileContents;
   // Get a git diff
   await coder.installDependencies();
   let lint = await coder.lint();
   let diff = await coder.gitDiff();
   // Prepare the query to confirm the resolution
-  const query = prepareTaskResolutionConfirmationQuery(taskString, summary.summary, summary.fileCodeMap, {lint, diff});
+  const query = prepareTaskResolutionConfirmationQuery(taskString, fileContents, {lint, diff});
 
   async function refineTaskResolutionQuery(llmResponse) {
     if (llmResponse[0].function !== 'pass') {
@@ -98,7 +118,16 @@ async function confirmTaskResolution(taskString, systemPrompt, summary, coder) {
       lint = await coder.lint();
       diff = await coder.gitDiff();
     }
-    return prepareTaskResolutionConfirmationQuery(taskString, coder.fileCodeMap, {lint, diff});
+    // update file contents
+    for (const fileName in fileContents) {
+      try {
+        fileContents[fileName] = await coder.executeCommand(`cat ${fileName}`);
+      } catch (err) {
+        console.log(`Failed to cat ${fileName}`, err);
+      }
+    }
+
+    return prepareTaskResolutionConfirmationQuery(taskString, fileContents, {lint, diff});
   }
 
   function isTaskResolutionSufficientFunction(llmResponse) {
