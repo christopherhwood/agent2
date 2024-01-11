@@ -126,24 +126,24 @@ function prepareSummaryConfirmationQuery(summary, taskDescription, fileCodeMap) 
 }
 
 function prepareImportantFunctionQuery(taskDescription, fileContents) {
-  let query = `## Task Description\n${taskDescription}\n\n`;
+  let query = `## Task\n${taskDescription}\n\n`;
   query += `## File Contents\n\`\`\`\n${fileContents}\n\`\`\`\n\n`;
 
   query += '## Important Function Request\n';
   query += 'Based on the task description and the file contents above, ';
-  query += 'which code snippets from the file should be focused on for investigation? ';
+  query += 'which code snippets from the file are most relevant to the task?\n';
   query += 'Use JSON for your response, in the format \n```\n{code: ["codesnippet1", "codesnippet2"]}\n```'; 
 
   return query;
 }
 
 function prepareImportantFunctionConfirmationQuery(taskDescription, fileContents, code) {
-  let query = `## Task Description\n${taskDescription}\n\n`;
+  let query = `## Task\n${taskDescription}\n\n`;
   query += `## File Contents\n\`\`\`\n${fileContents}\n\`\`\`\n\n`;
   query += `## Critical Code\n\`\`\`\n${code.join('```\n\n```')}\n\`\`\`\n\n`;
   
   query += '## Confirmation Request\n';
-  query += 'Examine the above critical code. Determine if it is sufficient and accurate for the task description and the file contents. ';
+  query += 'Examine the above critical code. Determine if the given code snippets are comprehensive in terms of providing all relevant code from the file contents based on the task. ';
   query += 'Reply using json in the format {code: ["codesnippet1", "codesnippet2"]}. ';
   query += 'Make whatever edits are necessary to the existing code snippet list, and return the list of critical code snippets from this file. ';
   return query;

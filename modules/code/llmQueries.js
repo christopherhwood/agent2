@@ -1,29 +1,5 @@
-function prepareTaskResolutionQuery(targetTask, rootTask, summary, fileCodeMap) {
-  let query = '# Task\n';
-  const buildTaskTree = (level, task) => {
-    // Build a query like: 
-    // ## Top Level Task Title
-    // Top Level Task Description
-    // ### Child Task Title
-    // Child Task Description
-    if (task === targetTask) {
-      query += `${'#'.repeat(level + 1)} TODO - ${task.title}\n`;
-    } else {
-      query += `${'#'.repeat(level + 1)} ${task.title}\n`;
-    }
-    query += `${task.description}\n`;
-    if (task.subtasks.length > 0) {
-      for (const subtask of task.subtasks) {
-        if (!buildTaskTree(level + 1, subtask)) {
-          return false;
-        }
-      }
-    } else if (task.title[0] !== '~') {
-      return false;
-    }
-    return true;
-  };
-  buildTaskTree(0, rootTask);
+function prepareTaskResolutionQuery(taskString, summary, fileCodeMap) {
+  let query = taskString;
 
   query += '# Summary of existing code\n';
   query += summary + '\n\n';
@@ -42,32 +18,8 @@ function prepareTaskResolutionQuery(targetTask, rootTask, summary, fileCodeMap) 
   return query;
 }
 
-function prepareTaskResolutionConfirmationQuery(targetTask, rootTask, summary, fileCodeMap, context) {
-  let query = '# Task\n';
-  const buildTaskTree = (level, task) => {
-    // Build a query like: 
-    // ## Top Level Task Title
-    // Top Level Task Description
-    // ### Child Task Title
-    // Child Task Description
-    if (task === targetTask) {
-      query += `${'#'.repeat(level + 1)} TODO - ${task.title}\n`;
-    } else {
-      query += `${'#'.repeat(level + 1)} ${task.title}\n`;
-    }
-    query += `${task.description}\n`;
-    if (task.subtasks.length > 0) {
-      for (const subtask of task.subtasks) {
-        if (!buildTaskTree(level + 1, subtask)) {
-          return false;
-        }
-      }
-    } else if (task.title[0] !== '~') {
-      return false;
-    }
-    return true;
-  };
-  buildTaskTree(0, rootTask);
+function prepareTaskResolutionConfirmationQuery(taskString, summary, fileCodeMap, context) {
+  let query = taskString;
   
   for (const key of Object.keys(context)) {
     query += `# ${key[0].toUpperCase() + key.slice(1)}\n\`\`\`\n${context[key]}\n\`\`\`\n\n`;
@@ -75,7 +27,7 @@ function prepareTaskResolutionConfirmationQuery(targetTask, rootTask, summary, f
 
   query += '# Summary of existing code\n';
   query += summary + '\n\n';
-  
+
   query += '# Key Code Snippets (prior to diff above)\n\n';
   for (const fileName of Object.keys(fileCodeMap)) {
     query += `## ${fileName}\n`;

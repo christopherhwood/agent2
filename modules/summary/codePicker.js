@@ -42,6 +42,8 @@ async function pickImportantCodeFromRepoForTask(repoName, taskDescription) {
     // Get important functions for any new files & confirm the important functions
     const newFileCodeMap = await getImportantFunctionsFromFiles(taskDescription, repoName, newFileNames);
     fileCodeMap = fileCodeMap.concat(newFileCodeMap);
+    // Filter out files with empty code arrays
+    fileCodeMap = fileCodeMap.filter(file => file.code.length > 0);
     iterations++;
   }
 
