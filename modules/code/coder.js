@@ -16,19 +16,15 @@ class Coder {
     task.commitHash = await executeCommand('git rev-parse HEAD', this.repoName, container);
 
     await destroyContainer(container);
-    this.editedFiles = new Set();
-    this.filesToRemove = [];
   }
   
   async createFile(path, contents) {
     // mkdir for all paths but make sure to exclude filename
     await executeCommand(`mkdir -p ${path.substring(0, path.lastIndexOf('/'))} && echo "${contents}" > ${path}`, this.repoName);
-    this.editedFiles.add(path);
   }
 
   async deleteFile(path) {
     await executeCommand(`rm ${path}`, this.repoName);
-    this.filesToRemove.push(path);
   }
 
   async editCode(path, originalCode, newCode) {
@@ -45,7 +41,6 @@ class Coder {
     
     // Destroy the container
     await destroyContainer(container);
-    this.editedFiles.add(path);
     return output;
   }
 
