@@ -35,7 +35,7 @@ async function resolveTask(targetTask, coder) {
 
   let fileContents = {};
   const keyFiles = await selectKeyFiles(coder.repoName, taskString);
-  for (const fileName in keyFiles) {
+  for (const fileName of keyFiles.files) {
     try {
       fileContents[fileName] = await coder.executeCommand(`cat ${fileName}`);
     } catch (err) {

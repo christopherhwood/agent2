@@ -1,13 +1,9 @@
 const { createContainer, destroyContainer, executeCommand } = require('../../dockerOperations.js');
-const { getImportantFunctionsFromFiles } = require('../summary/codePicker.js');
 
 class Coder {
-  constructor(repoName, fileCodeMap, rootTask) {
+  constructor(repoName, rootTask) {
     this.repoName = repoName;
-    this.fileCodeMap = fileCodeMap;
     this.rootTask = rootTask;
-    this.editedFiles = new Set();
-    this.filesToRemove =[];
   }
 
   async commitChanges(task) {
@@ -15,22 +11,6 @@ class Coder {
 
     // Commit the changes to git  
     await executeCommand(`git add . && git commit -m  "${task.title}\n\n${task.description}"`, this.repoName, container);
-
-    // Delete records for removed files
-    for (const fileToRemove of this.filesToRemove) {
-      delete this.fileCodeMap[fileToRemove];
-      if (this.editedFiles.has(fileToRemove)) {
-        this.editedFiles.delete(fileToRemove);
-      }
-    }
-
-    // Recreate code maps for all edited files
-    if (this.editedFiles.size > 0) {
-      const editedFileCodeMap = await getImportantFunctionsFromFiles(this.rootTask, this.repoName, Array.from(this.editedFiles));
-      for (const file of this.editedFiles) {
-        this.fileCodeMap[file] = editedFileCodeMap[file];
-      }
-    }
 
     // Add commit hash to the task
     task.commitHash = await executeCommand('git rev-parse HEAD', this.repoName, container);
@@ -133,7 +113,7 @@ class Coder {
         type: 'function',
         function: {
           name: 'editCode',
-          description: 'Replaces the original code snippet with the new code snippet at the provided path. Useful for modifying existing code.',
+          description: 'Replaces the original code snippet with the new code snippet at the provided path. Useful for modifying existing code. The new code snippet will completely overwrite the original snippet so it should be complete and ready for use.',
           parameters: {
             type: 'object',
             properties: {
