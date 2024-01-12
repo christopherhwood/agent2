@@ -1,6 +1,6 @@
 
 const { prepareTaskResolutionQuery, prepareTaskResolutionConfirmationQuery } = require('./llmQueries');
-const { selectKeyFiles } = require('../summary/codePicker');
+const { selectKeyFiles, getRepoContext } = require('../summary/codePicker');
 const { queryLlmWithTools, iterateLlmQuery } = require('../../llmService');
 const { CoderSystemPrompt, CodeReviewerSystemPrompt } = require('./systemPrompts');
 
@@ -34,7 +34,8 @@ async function resolveTask(targetTask, coder) {
   buildTaskTree(0, coder.rootTask);
 
   let fileContents = {};
-  const keyFiles = await selectKeyFiles(coder.repoName, taskString);
+  const context = await getRepoContext(coder.repoName);
+  const keyFiles = await selectKeyFiles(taskString, context);
   for (const fileName of keyFiles.files) {
     try {
       fileContents[fileName] = await coder.executeCommand(`cat ${fileName}`);
@@ -86,6 +87,7 @@ async function recursivelyResolveTasks(task, coder) {
   for (const subtask of task.subtasks) {
     await recursivelyResolveTasks(subtask, coder);
   }
+  await resolveTask(task, coder);
   task.title = '~' + task.title + '~';
   task.description = '~' + task.description + '~';
   return;

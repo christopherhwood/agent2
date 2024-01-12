@@ -20,7 +20,7 @@ class Coder {
   
   async createFile(path, contents) {
     // mkdir for all paths but make sure to exclude filename
-    await executeCommand(`mkdir -p ${path.substring(0, path.lastIndexOf('/'))} && echo "${contents}" > ${path}`, this.repoName);
+    await executeCommand(`mkdir -p ${path.substring(0, path.lastIndexOf('/'))} && cat << 'EOF' > ${path}\n${contents}\nEOF`, this.repoName);
   }
 
   async deleteFile(path) {
@@ -32,9 +32,9 @@ class Coder {
     const container = await createContainer(this.repoName);
 
     // Echo the code to a temp file in the container
-    await executeCommand(`echo "${newCode}" > /usr/src/temp`, this.repoName, container);
+    await executeCommand(`cat << 'EOF' > /usr/src/temp\n${newCode}\nEOF`, this.repoName, container);
 
-    await executeCommand(`echo "${originalCode}" > /usr/src/original`, this.repoName, container);
+    await executeCommand(`cat << 'EOF' > /usr/src/original\n${originalCode}\nEOF`, this.repoName, container);
     
     // Insert the code into the specified file using the /usr/bin/insertCode.js script
     const output = await executeCommand(`/usr/bin/replaceCode.js ${path} /usr/src/original /usr/src/temp`, this.repoName, container);

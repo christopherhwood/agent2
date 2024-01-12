@@ -5,7 +5,10 @@ const { FilePickerSystemPrompt, FunctionPickerSystemPrompt } = require('./system
 
 async function pickImportantCodeFromRepoForTask(repoName, taskDescription) {
   // 1. Get directory tree & recent commits
-  let fileNames = await selectKeyFiles(repoName, taskDescription);
+  const context = await getRepoContext(repoName);
+
+  // 1. Get directory tree & recent commits
+  let fileNames = await selectKeyFiles(taskDescription, context);
   console.log('key files:');
   console.log(fileNames);
 
@@ -46,10 +49,7 @@ async function pickImportantCodeFromRepoForTask(repoName, taskDescription) {
   return fileCodeMap;  
 }
 
-async function selectKeyFiles(repoName, taskDescription) {
-  // 1. Get directory tree & recent commits
-  const context = await getInitialContext(repoName); 
-
+async function selectKeyFiles(taskDescription, context) {
   // 2. & 3. Get and fetch investigation suggestions
   const fileSelectionQuery = prepareFileSelectionQuery(taskDescription, context);
   let fileNames = await queryLlmWithJsonCheck([{role: 'system', content: FilePickerSystemPrompt}, {role: 'user', content: fileSelectionQuery}], validateFileSelectionResponse);
@@ -76,7 +76,7 @@ async function getImportantFunctionsFromFiles(taskDescription, repoName, fileNam
   return fileCodeMap;
 }
 
-async function getInitialContext(repoName) {
+async function getRepoContext(repoName) {
   const container = await createContainer(repoName);
   // Update the repo first
   const defaultBranch = await executeCommand('git --no-pager remote show origin | grep "HEAD branch" | cut -d" " -f5', repoName, container);
@@ -114,4 +114,4 @@ function validateImportantFunctionResponse(jsonResponse) {
   return jsonResponse;
 }
 
-module.exports = { selectKeyFiles, pickImportantCodeFromRepoForTask, getImportantFunctionsFromFiles };
+module.exports = { getRepoContext, selectKeyFiles, pickImportantCodeFromRepoForTask, getImportantFunctionsFromFiles };
