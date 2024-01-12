@@ -35,49 +35,34 @@ function prepareRoughPlanConfirmationQuery(roughPlan, taskDescription, summary) 
 }
 
 function prepareTaskTreeQuery(taskDescription, summary, roughPlan) {
-  let query = `## Task Description\n${taskDescription}\n\n`;
-  query += `## Summary\n${summary}\n\n`;
-  query += `## Rough Plan\n${roughPlan}\n\n`;
-
-  query += '## Task Tree Request\n';
-  query += 'Based on the task description, summary, and rough plan above, ';
-  query += 'please provide a task tree for completing the task. ';
-  query += 'The task tree should include a list of steps to follow, ';
-  query += 'and leaf tasks should be granular to the point of only requiring inserting code, replacing code, deleting code, or executing a terminal command (like npm commands, creating a new file, etc). ';
-  query += 'Each leaf task should be as detailed as possible in the description and should explicitly mention whether code should be added, replaced, or deleted or if a terminal command is needed. ';
-  query += 'DO NOT include tasks like reviewing files that are already attached. Instead, distill the keypoints from those files into the plan. ';
-  query += 'DO NOT include setting up the environment or cloning the repo. ';
-  query += 'DO NOT include committing changes, deployment, code review, or documentation. ';
-  query += 'Reply using json with the following recursive structure: {title: "", description: "", subtasks: []}.';
-
-  return query;
-}
-
-function prepareTaskTreeConfirmationQuery(taskTree, taskDescription, summary, roughPlan) {
-  let query = `## Task Tree for Confirmation\n${JSON.stringify(taskTree)}\n\n`;
-  query += `## Task Description\n${taskDescription}\n\n`;
-  query += `## Summary\n${summary}\n\n`;
-  query += `## Rough Plan\n${roughPlan}\n\n`;
-
-  query += '## Confirmation Request\n';
-  query += 'Examine the above task tree. Determine if it is sufficient and accurate for the task description, summary, and rough plan. ';
-  query += 'Ensure the tree DOES NOT mention anything about environment setup or cloning the repo. ';
-  query += 'Ensure the tree DOES NOT mention anything about committing changes, deployment, code review, or documentation. ';
-  query += 'If it is sufficient, respond with an empty json object. If not, make edits where needed and provide a revised task tree. ';
-  query += 'Revised task trees will overwrite previous task trees, and as such they must not refer to previous task tree contents in any way.\n\n';
-  query += 'A revised task tree should: \n';
-  query += '- Include a list of steps to follow.\n';
-  query += '- Be extremely detailed in the descriptions.\n';
-  query += '- Include leaf nodes that are granular to the point of only requiring inserting code, replacing code, deleting code, or executing a terminal command (like npm commands, creating a new file, etc).\n';
-  query += '- Explicity mention whether code should be added, replaced, or deleted or if a terminal command is needed.\n';
-  query += '- Use json with the following recursive structure: {title: "", description: "", subtasks: []}.\n';
-
-  return query;
+  return `
+      Create a JSON-structured list of coding tasks based on the following Markdown-formatted inputs:
+  
+      1. Rough Text Plan (in Markdown):
+         \`\`\`markdown
+         ${roughPlan}
+         \`\`\`
+  
+      2. Original Task Description:
+         ${taskDescription}
+  
+      3. Summary of the Codebase (in JSON):
+         \`\`\`json
+         ${summary}
+         \`\`\`
+  
+      Analyze the rough text plan, which details the coding strategy for a developer in a pre-setup environment, leading to a pull request. This plan, along with the task description and codebase summary, are your guides.
+  
+      Your task is to dissect this plan into individual, actionable coding tasks, each formatted as a JSON object. Include in each task: a unique identifier, title, detailed description, pseudocode, dependencies, and completion criteria.
+  
+      Ensure that each task is comprehensive and self-contained, equipped with all the information necessary for independent execution by a developer. The aim is to create a clear, structured series of tasks that accurately follow the plan and are aligned with the project's goals, as outlined in the Markdown-formatted inputs.
+  
+      Structure your response as a JSON file containing a list of these tasks, formatted for straightforward implementation in the coding process.
+    `;
 }
 
 module.exports = {
   prepareRoughPlanQuery,
   prepareRoughPlanConfirmationQuery,
   prepareTaskTreeQuery,
-  prepareTaskTreeConfirmationQuery
 };
