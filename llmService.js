@@ -26,6 +26,11 @@ async function queryLlm(messages) {
     return response.choices[0].message.content;
   } catch (error) {
     console.error('Error querying LLM:', error);
+    if (error.status === 429) {
+      // wait 15 seconds and try again
+      await new Promise(resolve => setTimeout(resolve, 15000));
+      return await queryLlm(messages);
+    }
     throw error;
   }
 }
@@ -72,6 +77,11 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse, tries = 0) 
     return jsonResponse;
   } catch (error) {
     console.error('Error querying LLM:', error);
+    if (error.status === 429) {
+      // wait 15 seconds and try again
+      await new Promise(resolve => setTimeout(resolve, 15000));
+      return await queryLlm(messages);
+    }
     throw error;
   }
 }
@@ -114,6 +124,11 @@ async function queryLlmWithTools(messages, tools, tries = 0) {
     return toolCalls;
   } catch (error) {
     console.error('Error querying LLM:', error);
+    if (error.status === 429) {
+      // wait 15 seconds and try again
+      await new Promise(resolve => setTimeout(resolve, 15000));
+      return await queryLlm(messages);
+    }
     throw error;
   }
 }
