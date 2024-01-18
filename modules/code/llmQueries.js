@@ -1,5 +1,6 @@
 function prepareTaskResolutionQuery(taskString, fileContents) {
   let query = taskString;
+  query += '\n\n';
   
   query += '# Key Files\n\n';
   for (const fileName of Object.keys(fileContents)) {
@@ -17,6 +18,7 @@ function prepareTaskResolutionQuery(taskString, fileContents) {
 
 function prepareTaskResolutionConfirmationQuery(taskString, fileContents, context) {
   let query = taskString;
+  query += '\n\n';
 
   for (const key of Object.keys(context)) {
     query += `# ${key[0].toUpperCase() + key.slice(1)}\n\`\`\`\n${context[key]}\n\`\`\`\n\n`;

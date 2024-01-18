@@ -17,7 +17,9 @@ class GitIgnore {
   static async getGitIgnorePatterns(repoName) {
     const gitIgnoreContents = await executeCommand('cat .gitignore', repoName);
     const gitIgnoreLines = gitIgnoreContents.split('\n');
-    const gitIgnorePatterns = gitIgnoreLines.filter(line => line.length > 0 && !line.startsWith('#'));
+    const gitIgnorePatterns = gitIgnoreLines
+      .filter(line => line.length > 0 && !line.startsWith('#'))
+      .map(line => new RegExp('^' + line.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*') + '$'));
     return gitIgnorePatterns;
   }
 }

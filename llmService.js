@@ -11,7 +11,7 @@ const openai = new OpenAI(process.env.OPENAI_API_KEY);
  * @returns {string} - The response from GPT-4.
  * @throws Will throw an error if the query fails.
  */
-async function queryLlm(messages) {
+async function queryLlm(messages, temperature=0) {
   console.log('messages:');
   console.log(messages);
   try {
@@ -19,7 +19,7 @@ async function queryLlm(messages) {
       model: 'gpt-4-1106-preview',
       messages: messages,
       max_tokens: 4096,
-      temperature: 0,
+      temperature: temperature,
       top_p: 1,
     });
 
@@ -29,7 +29,7 @@ async function queryLlm(messages) {
     if (error.status === 429) {
       // wait 15 seconds and try again
       await new Promise(resolve => setTimeout(resolve, 15000));
-      return await queryLlm(messages);
+      return await queryLlm(messages, temperature);
     }
     throw error;
   }
@@ -45,7 +45,7 @@ async function queryLlm(messages) {
  * @returns {object} - The validated and possibly modified JSON response from GPT-4.
  * @throws Will throw an error if the response is not in valid JSON format or if the validation function finds issues.
  */
-async function queryLlmWithJsonCheck(messages, validateJsonResponse, tries = 0) {
+async function queryLlmWithJsonCheck(messages, validateJsonResponse, temperature=0, tries = 0) {
   console.log('messages:');
   console.log(messages);
   try {
@@ -53,7 +53,7 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse, tries = 0) 
       model: 'gpt-4-1106-preview',
       messages: messages,
       max_tokens: 4096,
-      temperature: 0,
+      temperature: temperature,
       top_p: 1,
       response_format: {type: 'json_object'}
     });
@@ -62,9 +62,9 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse, tries = 0) 
     try {
       jsonResponse = JSON.parse(response.choices[0].message.content);
     } catch (jsonError) {
-      console.error('Error parsing JSON response from LLM:', jsonError);
+      console.error('Error parsing JSON response from LLM:', jsonError, 'Content: ', response.choices[0].message.content);
       if (tries < 3) {
-        return await queryLlmWithJsonCheck([...messages, {role: 'assistant', content: JSON.stringify({content: response.choices[0].message.content})}, {role: 'user', content: 'You must provide a valid JSON response.'}], validateJsonResponse, tries + 1);
+        return await queryLlmWithJsonCheck([...messages, {role: 'assistant', content: JSON.stringify({content: response.choices[0].message.content})}, {role: 'user', content: 'You must provide a valid JSON response.'}], validateJsonResponse, temperature, tries + 1);
       }
       throw new Error('Received ill-formatted JSON response from LLM.');
     }
@@ -86,7 +86,7 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse, tries = 0) 
   }
 }
 
-async function queryLlmWithTools(messages, tools, tries = 0) {
+async function queryLlmWithTools(messages, tools, temperature, forceToolChoice = true, tries = 0) {
   console.log('messages:');
   console.log(messages);
   console.log('tools:');
@@ -96,38 +96,44 @@ async function queryLlmWithTools(messages, tools, tries = 0) {
       model: 'gpt-4-1106-preview',
       messages: messages,
       max_tokens: 4096,
-      temperature: 0,
+      temperature: temperature,
       top_p: 1,
       tools: tools,
       tool_choice: 'auto'
     });
 
-    console.log('Message Content: ' + response.choices[0].message.content);
+    console.log('LLM Tool Assistant Message: ' + JSON.stringify(response.choices[0].message));
     let toolCalls = response.choices[0].message.tool_calls;
-    try {
-      validateToolCalls(toolCalls, tools);
-    } catch (error) {
-      console.error('Error validating tool calls:', error);
-      if (tries < 3) {
-        return await queryLlmWithTools([...messages, {role: 'assistant', content: JSON.stringify({content: response.choices[0].message.content, tool_calls: response.choices[0].message.tool_calls})}, {role: 'user', content: 'You must correctly use the tools provided. You must use at least one tool in your response.'}], tools, tries + 1);
-      } else {
-        throw error;
-      }
-    } 
+    if (forceToolChoice || (toolCalls && toolCalls.length > 0)) {
+      try {
+        validateToolCalls(toolCalls, tools);
+      } catch (error) {
+        console.error('Error validating tool calls:', error);
+        if (tries < 3) {
+          return await queryLlmWithTools([...messages, {role: 'assistant', content: JSON.stringify({content: response.choices[0].message.content, tool_calls: response.choices[0].message.tool_calls})}, {role: 'user', content: 'You must correctly use the tools provided. You must use at least one tool in your response. ' + error.message}], tools, temperature, forceToolChoice, tries + 1);
+        } else {
+          throw error;
+        }
+      } 
 
-    toolCalls = toolCalls.map(toolCall => {
-      return {
-        function: toolCall.function.name,
-        arguments: JSON.parse(toolCall.function.arguments)
-      };
-    });
-    return toolCalls;
+      toolCalls = toolCalls.map(toolCall => {
+        return {
+          id: toolCall.id,
+          function: toolCall.function.name,
+          arguments: JSON.parse(toolCall.function.arguments)
+        };
+      });
+    } else {
+      toolCalls = [];
+    }
+    console.log('LLM Tool Calls: ' + JSON.stringify(toolCalls));
+    return {toolCalls, messages: [...messages, response.choices[0].message]};
   } catch (error) {
     console.error('Error querying LLM:', error);
     if (error.status === 429) {
       // wait 15 seconds and try again
       await new Promise(resolve => setTimeout(resolve, 15000));
-      return await queryLlm(messages);
+      return await queryLlmWithTools(messages, tools, temperature, tries);
     }
     throw error;
   }
@@ -171,12 +177,10 @@ async function iterateLlmQuery(
       return llmResponse; // The response is sufficient
     }
 
-    // Stringify llmResponse if it's an object
-    const responseContent = typeof llmResponse === 'object' ? JSON.stringify(llmResponse) : llmResponse;
-
     // Refine the query based on GPT's response and update the message history
     currentQuery = await refineQueryFunction(llmResponse, currentQuery);
-    messageHistory.push({role: 'assistant', content: responseContent}); // Add LLM's response to history
+    const { content, tool_calls } = llmResponse.messages[llmResponse.messages.length - 1];
+    messageHistory.push({role: 'assistant', content: JSON.stringify({content, tool_calls})}); // Add LLM's response to history, but add it as content so we don't have to respond to the tool use.
 
     iterationCount++;
     console.log(`Iteration ${iterationCount} complete.`);

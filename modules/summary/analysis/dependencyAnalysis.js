@@ -4,12 +4,10 @@ const path = require('path');
 const parser = new Parser();
 parser.setLanguage(JavaScript);
 
-const { executeCommand } = require('../../../dockerOperations');
-
-async function extractDependenciesFromFile(filePath) {
+async function extractDependenciesFromFile(filePath, executeCommand) {
   const fileContents = await executeCommand(`cat ${filePath}`);
   const tree = parser.parse(fileContents);
-  const queryObject = parser.getLanguage().query(query);
+  const queryObject = new Parser.Query(JavaScript, query);
   const matches = queryObject.matches(tree.rootNode);
 
   let externalDependencies = [];
@@ -17,7 +15,10 @@ async function extractDependenciesFromFile(filePath) {
   for (const match of matches) {
     for (const capture of match.captures) {
       if (capture.name === 'path') {
-        const importPath = capture.node.text.replace(/^["']|["']$/g, '');
+        // Remove starting and ending parentheses
+        let importPath = capture.node.text.replace(/^\(|\)$/g, '');
+        // Remove starting and ending quotes
+        importPath = importPath.replace(/^["']|["']$/g, '');
         const isLocal = determineIfDependencyIsLocal(importPath);
         if (isLocal) {
           // Resolve path to absolute path from root of repo
@@ -44,10 +45,13 @@ function resolveAbsolutePath(jsFilePath, relativeIncludePath) {
   // Get the directory of the JavaScript file
   const jsFileDir = path.dirname(jsFilePath);
 
-  // Resolve the relative include path to an absolute path
-  const absolutePath = path.resolve(jsFileDir, relativeIncludePath);
+  // Resolve the relative include path based on the JavaScript file directory
+  const resolvedPath = path.resolve(jsFileDir, relativeIncludePath);
 
-  return absolutePath;
+  // Convert the resolved path to a relative path from the repository root
+  const relativePathFromRoot = path.relative('.', resolvedPath);
+
+  return relativePathFromRoot;
 }
 
 const query = `

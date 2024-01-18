@@ -3,29 +3,34 @@ const JavaScript = require('tree-sitter-javascript');
 const parser = new Parser();
 parser.setLanguage(JavaScript);
 
-const { executeCommand } = require('../../../dockerOperations');
-
-async function extractFunctionDeclarationsFromFile(fileName) {
+async function extractFunctionDeclarationsFromFile(fileName, executeCommand) {
   const fileContents = await executeCommand(`cat ${fileName}`);
   const tree = parser.parse(fileContents);
-  const queryObject = parser.getLanguage().query(query);
+  const queryObject = new Parser.Query(JavaScript, query);
   const matches = queryObject.matches(tree.rootNode);
 
   let functions = []; 
   for (const match of matches) {
+    let func = {name: '', parameters: []};
     for (const capture of match.captures) {
-      let func = {name: '', parameters: []};
       if (capture.name === 'function-name') {
         func.name = capture.node.text;
       } else if (capture.name === 'parameters') {
-        capture.node.namedChildren.forEach(child => {
-          if (child.type === 'identifier') {
-            func.parameters.push(child.text);
+        const identifierQuery = `
+(identifier) @identifier
+`;
+        const identifierQueryObject = new Parser.Query(JavaScript, identifierQuery);
+        capture.node.children.forEach(child => {
+          const identifierMatches = identifierQueryObject.matches(child);
+          for (const identifierMatch of identifierMatches) {
+            for (const identifierCapture of identifierMatch.captures) {
+              func.parameters.push(identifierCapture.node.text);
+            }
           }
         });
       }
-      functions.push(func);
     }
+    functions.push(func);
   }
 
   return functions;

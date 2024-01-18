@@ -1,5 +1,3 @@
-const { executeCommand } = require('../../../dockerOperations');
-
 class DirectoryExplorer {
   constructor (executeCommand, gitIgnore) {
     this.executeCommand = executeCommand;
@@ -10,12 +8,13 @@ class DirectoryExplorer {
     let directories = [];
     let files = [];
 
-    const lsOutput = await executeCommand(`ls -l ${directory}`);
+    const lsOutput = await this.executeCommand(`ls -l ${directory}`);
     const lsLines = lsOutput.split('\n');
     for (const line of lsLines) {
       try {
         const {fileName, isDirectory} = parseLsLine(line);
-        if (this.gitIgnore.checkIfFileIsIgnored(fileName)) {
+        const gitIgnoreName = isDirectory ? fileName + '/' : fileName;
+        if (this.gitIgnore.checkIfFileIsIgnored(gitIgnoreName)) {
           continue;
         }
         if (isDirectory) {

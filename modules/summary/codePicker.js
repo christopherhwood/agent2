@@ -1,79 +1,11 @@
 const { createContainer, destroyContainer, executeCommand } = require('../../dockerOperations');
 const { queryLlmWithJsonCheck } = require('../../llmService');
-const { prepareFileSelectionQuery, prepareFileSelectionConfirmationQuery, prepareImportantFunctionQuery, prepareImportantFunctionConfirmationQuery } = require('./llmQueries');
-const { FilePickerSystemPrompt, FunctionPickerSystemPrompt } = require('./systemPrompts');
-
-async function pickImportantCodeFromRepoForTask(repoName, taskDescription) {
-  // 1. Get directory tree & recent commits
-  const context = await getRepoContext(repoName);
-
-  // 1. Get directory tree & recent commits
-  let fileNames = await selectKeyFiles(taskDescription, context);
-  console.log('key files:');
-  console.log(fileNames);
-
-  let fileCodeMap = await getImportantFunctionsFromFiles(taskDescription, repoName, fileNames.files); 
-  console.log('key code:');
-  console.log(fileCodeMap);
-
-  let iterations = 0;
-  while (iterations < 3) {
-    // Confirm the file selection
-    const confirmationQuery = prepareFileSelectionConfirmationQuery(taskDescription, context, fileCodeMap);
-    const confirmedFileNames = await queryLlmWithJsonCheck([{role: 'system', content: FilePickerSystemPrompt}, {role: 'user', content: confirmationQuery}], validateFileSelectionResponse);
-
-    // Check if any files not included in original selection are now included
-    const newFileNameSet = new Set([...confirmedFileNames.files, ...fileNames.files]);
-    const oldFileNameSet = new Set(fileNames.files);
-    const newFileNames = [...newFileNameSet].filter(fileName => !oldFileNameSet.has(fileName));
-
-    if (newFileNames.length === 0 && newFileNameSet.length === oldFileNameSet.length) {
-      break;
-    }
-    console.log('new files:');
-    console.log(newFileNames);
-
-    fileNames = confirmedFileNames;
-
-    // Filter any removed files out of the fileCodeMap
-    fileCodeMap = fileCodeMap.filter(file => newFileNameSet.has(file.name));
-
-    // Get important functions for any new files & confirm the important functions
-    const newFileCodeMap = await getImportantFunctionsFromFiles(taskDescription, repoName, newFileNames);
-    fileCodeMap = fileCodeMap.concat(newFileCodeMap);
-    // Filter out files with empty code arrays
-    fileCodeMap = fileCodeMap.filter(file => file.code.length > 0);
-    iterations++;
-  }
-
-  return fileCodeMap;  
-}
 
 async function selectKeyFiles(taskDescription, context) {
   // 2. & 3. Get and fetch investigation suggestions
   const fileSelectionQuery = prepareFileSelectionQuery(taskDescription, context);
   let fileNames = await queryLlmWithJsonCheck([{role: 'system', content: FilePickerSystemPrompt}, {role: 'user', content: fileSelectionQuery}], validateFileSelectionResponse);
   return fileNames;
-}
-
-async function getImportantFunctionsFromFiles(taskDescription, repoName, fileNames) {
-  // Get file contents & ask LLM to select important sections of contents.
-  let fileCodeMap = {};
-  for (const fileName of fileNames) {
-    const contents = await executeCommand(`cat ${fileName}`, repoName);
-    const importantFunctionQuery = prepareImportantFunctionQuery(taskDescription, contents);
-    const importantFunctionResponse = await queryLlmWithJsonCheck([{role: 'system', content: FunctionPickerSystemPrompt}, {role: 'user', content: importantFunctionQuery}], validateImportantFunctionResponse);
-
-    // Filter out any hallucincated code
-    importantFunctionResponse.code = importantFunctionResponse.code.filter(code => contents.includes(code));
-
-    // confirm important functions
-    const importantFunctions = await confirmImportantFunctions(taskDescription, contents, importantFunctionResponse.code);
-
-    // Filter out any hallucincated code
-    fileCodeMap[fileName] = importantFunctions.code.filter(code => contents.includes(code));
-  }
-  return fileCodeMap;
 }
 
 async function getRepoContext(repoName) {
@@ -94,12 +26,6 @@ async function getRepoContext(repoName) {
   };
 }
 
-async function confirmImportantFunctions(taskDescription, contents, importantFunctions) {
-  const confirmationQuery = prepareImportantFunctionConfirmationQuery(taskDescription, contents, importantFunctions);
-  const confirmationResponse = await queryLlmWithJsonCheck([{role: 'system', content: FunctionPickerSystemPrompt}, {role: 'user', content: confirmationQuery}], validateImportantFunctionResponse);
-  return confirmationResponse;
-}
-
 function validateFileSelectionResponse(jsonResponse) {
   if (!jsonResponse.files) {
     jsonResponse.files = []; // Set default value if 'files' key is missing
@@ -107,11 +33,43 @@ function validateFileSelectionResponse(jsonResponse) {
   return jsonResponse;
 }
 
-function validateImportantFunctionResponse(jsonResponse) {
-  if (!jsonResponse.code) {
-    jsonResponse.code = []; // Set default value if 'code' key is missing
-  }
-  return jsonResponse;
+/**
+ * Prepares a query for GPT-4 to suggest files for investigation.
+ * 
+ * @param {string} taskDescription - The user-provided description of the task.
+ * @param {object} context - The context from the repository, including directory tree and recent commits.
+ * @returns {string} - The formulated query for GPT-4.
+ */
+function prepareFileSelectionQuery(taskDescription, context) {
+  let query = `${taskDescription}\n\n`;
+
+  // Add context about the repository with Markdown formatting
+  query += '## Repository Context\n';
+  query += `### Directory Tree\n\`\`\`\n${context.directoryTree}\n\`\`\`\n`;
+  query += `### Recent Commits\n\`\`\`\n${context.recentCommits}\n\`\`\`\n\n`;
+
+  // Ask GPT-4 for specific files to investigate
+  query += 'Based on the above task/project description and repository context, ';
+  query += 'which files should be focused on for investigation? ';
+  query += 'Please use JSON for your response, in the format \n```\n{files: []}\n```';
+
+  return query;
 }
 
-module.exports = { getRepoContext, selectKeyFiles, pickImportantCodeFromRepoForTask, getImportantFunctionsFromFiles };
+const FilePickerSystemPrompt = `You are an advanced code analysis bot with expertise in JavaScript codebases. Your mission extends beyond identifying files directly related to a specific development task/project in a Git repository. You are also tasked with understanding the broader context of the repository to ensure that the task/project-specific files can be interpreted correctly within the overall framework of the codebase.
+
+Upon receiving the directory structure, a list of recent commits, and the task/project description, your task involves:
+
+1. Conducting a thorough analysis of the directory tree to determine the key JavaScript files. This includes identifying files that are directly relevant to the task/project and those essential for grasping the high-level functionality of the entire repository. Assess the codebase's organization, architecture, and key components to ensure a holistic understanding.
+
+2. Integrating this analysis with the specifics of the task/project to ascertain the most pertinent files. This should include files directly involved in the task/project, as well as foundational files that provide context and insight into how the codebase operates as a whole.
+
+3. Compiling your findings into a structured JSON object. This object should contain an array of relative paths for the identified files, ensuring they are referenced relative to the root of the repository as per the provided directory tree.
+
+Example output format:
+
+{ "files": ["relative/path/to/file1.js", "relative/path/to/core_module.js", "relative/path/to/utility.js", "relative/path/to/task_specific_file.js"] }
+
+Your analysis should be comprehensive and insightful, enabling the user to not only focus on the task/project at hand but also understand the codebase in its entirety. The goal is to provide a list of files that are both directly relevant to the task/project and crucial for understanding the overall structure and functionality of the repository.`;
+
+module.exports = { getRepoContext, selectKeyFiles };

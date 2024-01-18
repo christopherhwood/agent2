@@ -59,6 +59,26 @@ async function cloneRepositoryInContainer(gitRepoUrl, userToken) {
   }
 }
 
+class Container {
+  static async Create(repoName) {
+    const container = await createContainer(repoName);
+    return new Container(repoName, container);
+  }
+
+  constructor(repoName, container) {
+    this.repoName = repoName;
+    this.container = container;
+  }
+
+  async executeCommand(command) {
+    return await executeCommand(command, this.repoName, this.container);
+  }
+
+  async destroy() {
+    await destroyContainer(this.container);
+  }
+}
+
 // Returns a handle to the Docker container
 // that can be passed in and used in other requests.
 // Remember to manually destroy your container if you start it manually.
@@ -145,6 +165,7 @@ async function executeCommand(command, repoName, preExistingContainer) {
 }
 
 module.exports = {
+  Container,
   cloneRepositoryInContainer,
   createContainer,
   destroyContainer,

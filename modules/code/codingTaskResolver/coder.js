@@ -1,9 +1,9 @@
-const { createContainer, destroyContainer, executeCommand } = require('../../dockerOperations.js');
+const { createContainer, destroyContainer, executeCommand } = require('../../../dockerOperations.js');
 
 class Coder {
-  constructor(repoName, rootTask) {
+  constructor(repoName) {
     this.repoName = repoName;
-    this.rootTask = rootTask;
+    this.fileContext = new Set();
   }
 
   async commitChanges(task) {
@@ -19,8 +19,11 @@ class Coder {
   }
   
   async createFile(path, contents) {
-    // mkdir for all paths but make sure to exclude filename
-    await executeCommand(`mkdir -p ${path.substring(0, path.lastIndexOf('/'))} && cat << 'EOF' > ${path}\n${contents}\nEOF`, this.repoName);
+    const dir = path.substring(0, path.lastIndexOf('/'));
+    if (dir.length > 0) {
+      await executeCommand(`mkdir -p ${dir}`, this.repoName);
+    }
+    await executeCommand(`cat << 'EOF' > ${path}\n${contents}\nEOF`, this.repoName);
   }
 
   async deleteFile(path) {
