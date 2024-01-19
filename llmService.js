@@ -86,6 +86,73 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse, temperature
   }
 }
 
+async function queryLlmWTools(messages, tools, toolRouter, temperature, tries = 0) {
+  console.log('messages:');
+  console.log(messages);
+  console.log('tools:');
+  console.log(tools);
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4-1106-preview',
+      messages: messages,
+      max_tokens: 4096,
+      temperature: temperature,
+      top_p: 1,
+      tools: tools,
+      tool_choice: 'auto'
+    });
+
+    console.log('LLM Tool Assistant Message: ' + JSON.stringify(response.choices[0].message));
+
+    const toolCalls = response.choices[0].message.tool_calls;
+    let toolCallResponses = [];
+    if (toolCalls && toolCalls.length > 0) {
+      if (toolCalls[0].function.name === 'pass') {
+        return response.choices[0].message.content;
+      }
+      
+      toolCallResponses = toolCalls.map(toolCall => {
+        let response = {
+          tool_call_id: toolCall.id,
+          role: 'tool',
+          name: toolCall.function.name
+        };
+
+        let args;
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch (err) {
+          response.content = `Error parsing arguments for tool call ${toolCall.function.name}: ${err}`;
+          return response;
+        }
+        
+        let output;
+        try {
+          output = toolRouter.routeToolCall({function: toolCall.function.name, arguments: args});
+        } catch (err) {
+          response.content = `Error executing tool call ${toolCall.function.name}: ${err}`;
+          return response;
+        }
+        
+        response.content = output;
+        return response;
+      });
+
+      return await queryLlmWTools([...messages, response.choices[0].message, ...toolCallResponses], tools, toolRouter, temperature, tries);
+    }
+    
+    return response.choices[0].message;
+  } catch (error) {
+    console.error('Error querying LLM:', error);
+    if (error.status === 429) {
+      // wait 15 seconds and try again
+      await new Promise(resolve => setTimeout(resolve, 15000));
+      return await queryLlmWTools(messages, tools, temperature, tries);
+    }
+    throw error;
+  }
+}
+
 async function queryLlmWithTools(messages, tools, temperature, forceToolChoice = true, tries = 0) {
   console.log('messages:');
   console.log(messages);
@@ -251,6 +318,7 @@ function validateToolCalls(toolCalls, tools) {
 module.exports = {
   queryLlm,
   queryLlmWithJsonCheck,
+  queryLlmWTools,
   queryLlmWithTools,
   iterateLlmQuery
 };

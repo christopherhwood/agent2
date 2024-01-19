@@ -1,9 +1,19 @@
-const { createContainer, destroyContainer, executeCommand } = require('../../../dockerOperations.js');
+const { createContainer, destroyContainer, executeCommand } = require('../../../../dockerOperations.js');
+const { getRepoContext, selectKeyFiles } = require('../../../summary/codePicker.js');
 
 class Coder {
   constructor(repoName) {
     this.repoName = repoName;
     this.fileContext = new Set();
+  }
+
+  async getRepoContext() {
+    return await getRepoContext(this.repoName);
+  }
+
+  async selectKeyFiles(task) {
+    const llmPickedKeyFiles = await selectKeyFiles(task, this.repoName);
+    return [...new Set([...llmPickedKeyFiles.files, ...this.fileContext])];
   }
 
   async commitChanges(task) {
@@ -24,10 +34,12 @@ class Coder {
       await executeCommand(`mkdir -p ${dir}`, this.repoName);
     }
     await executeCommand(`cat << 'EOF' > ${path}\n${contents}\nEOF`, this.repoName);
+    return `Created ${path} with contents:\n${contents}`;
   }
 
   async deleteFile(path) {
     await executeCommand(`rm ${path}`, this.repoName);
+    return `Deleted ${path}`;
   }
 
   async editCode(path, originalCode, newCode) {
@@ -44,7 +56,11 @@ class Coder {
     
     // Destroy the container
     await destroyContainer(container);
-    return output;
+    if (output.length > 0) {
+      return output;
+    } else {
+      return `Replaced ${originalCode} with ${newCode} in ${path}`;
+    }
   }
 
   async executeCommand(command) {

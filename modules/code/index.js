@@ -1,6 +1,6 @@
-const { resolveCodingTask, Coder } = require('./codingTaskResolver/index.js');
-const { resolveNonCodingTask, NonCoder } = require('./nonCodingTaskResolver/index.js');
-const { executeCommand } = require('../../dockerOperations.js');
+const { resolveCodingTask, Coder } = require('./codingTaskResolver');
+const { resolveNonCodingTask, NonCoder } = require('./nonCodingTaskResolver');
+const { executeCommand } = require('../../dockerOperations');
 
 async function resolveTasks(tasks, repoName) {
   const nonCoder = await NonCoder.Create(repoName);
