@@ -1,17 +1,12 @@
 const { queryLlmWTools } = require('../../../../llmService');
 const Analyzer = require('./analyzer');
 
-async function reviewCodeAndFileIssues(task, coder) {
-  const gitDiff = await coder.executeCommand('git diff -U5');
-  if (!gitDiff || gitDiff.length === 0) {
-    return;
-  }
-
+async function reviewCodeAndFileIssues(task, coder, gitDiff) {
   const { directoryTree } = await coder.getRepoContext();
   const query = createQuery(task, gitDiff);
   const systemPrompt = analyzeChangesSystemPrompt(directoryTree);
   const analyzer = await Analyzer.Create(coder.repoName);
-  await queryLlmWTools([{role: 'system', prompt: systemPrompt}, {role: 'user', prompt: query}], analyzer.getTools(), analyzer);
+  await queryLlmWTools([{role: 'system', content: systemPrompt}, {role: 'user', content: query}], analyzer.getTools(), analyzer);
   return analyzer.issues;
 }
 

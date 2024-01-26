@@ -1,5 +1,5 @@
-const { extractDependenciesFromFile } = require('./dependencyAnalysis');
-const { extractFunctionDeclarationsFromFile } = require('./functionAnalysis');
+const { extractDependencies } = require('./dependencyAnalysis');
+const { extractFunctions } = require('./functionAnalysis');
 const { Container } = require('../../../dockerOperations');
 
 class Analyzer {
@@ -15,11 +15,12 @@ class Analyzer {
   }
 
   async visitFile(fileName) {
-    const [dependencies, functions] = await Promise.all([
-      extractDependenciesFromFile(fileName, this.container.executeCommand.bind(this.container)),
-      extractFunctionDeclarationsFromFile(fileName, this.container.executeCommand.bind(this.container))
-    ]);
-    this.files.push({ fileName, dependencies, functions });
+    const fileContents = await this.container.executeCommand(`cat ${fileName}`);
+    const dependencies = await extractDependencies(fileContents, fileName, this.container.repoName);
+    const functions = extractFunctions(fileContents);
+    const localDependencyFileNames = dependencies.local.map(d => d.pathRelativeToRoot);
+    const externalDependencyNames = dependencies.external.map(d => d.name);
+    this.files.push({ fileName, dependencies: {local: localDependencyFileNames, external: externalDependencyNames}, functions });
   }
 
   async destroy() {

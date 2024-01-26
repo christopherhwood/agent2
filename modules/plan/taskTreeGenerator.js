@@ -24,8 +24,8 @@ function prepareTaskTreeQuery(taskDescription, summary, answers, roughPlan) {
       2. Original Task Description:
          ${taskDescription}
   
-      3. Summary of the Codebase (in JSON):
-         \`\`\`json
+      3. Summary of the Codebase (in Markdown):
+         \`\`\`markdown
          ${summary}
          \`\`\`
 

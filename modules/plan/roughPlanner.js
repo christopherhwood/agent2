@@ -1,36 +1,38 @@
-const { queryLlm, iterateLlmQuery } = require('../../llmService.js');
+const { queryLlm } = require('../../llmService.js');
 
 async function generateRoughPlan(taskDescription, summary, answers) {
 
   const query = prepareRoughPlanQuery(taskDescription, summary, answers);
   const response = await queryLlm([{role: 'system', content: RoughPlannerSystemPrompt}, {role: 'user', content: query}]);
 
+  return response;
+  // Below is commented out for now, might use later. 
   // Confirm response
-  const confirmationResponse = await confirmRoughPlanWithLlm(response, taskDescription, summary, answers, RoughPlannerSystemPrompt);
-  return confirmationResponse;
+  // const confirmationResponse = await confirmRoughPlanWithLlm(response, taskDescription, summary, answers, RoughPlannerSystemPrompt);
+  // return confirmationResponse;
 }
 
-async function confirmRoughPlanWithLlm(roughPlan, taskDescription, summary, answers, systemPrompt) {
-  let currentRoughPlan = roughPlan;
-  // Prepare the query to confirm the rough plan
-  const initialConfirmationQuery = prepareRoughPlanConfirmationQuery(roughPlan, taskDescription, summary, answers);
+// async function confirmRoughPlanWithLlm(roughPlan, taskDescription, summary, answers, systemPrompt) {
+//   let currentRoughPlan = roughPlan;
+//   // Prepare the query to confirm the rough plan
+//   const initialConfirmationQuery = prepareRoughPlanConfirmationQuery(roughPlan, taskDescription, summary, answers);
 
-  async function refineRoughPlanQueryFunction(llmResponse) {
-    if (!llmResponse.includes('ok') && llmResponse.length < 10) {
-      currentRoughPlan = llmResponse;
-    }
-    return prepareRoughPlanConfirmationQuery(llmResponse, taskDescription, summary, answers);
-  }
+//   async function refineRoughPlanQueryFunction(llmResponse) {
+//     if (!llmResponse.includes('ok') && llmResponse.length < 10) {
+//       currentRoughPlan = llmResponse;
+//     }
+//     return prepareRoughPlanConfirmationQuery(llmResponse, taskDescription, summary, answers);
+//   }
 
-  function isRoughPlanSufficientFunction(llmResponse) {
-    // Check if GPT's response is "ok", indicating the rough plan is sufficient
-    return llmResponse.includes('ok') && llmResponse.length < 10;
-  }
+//   function isRoughPlanSufficientFunction(llmResponse) {
+//     // Check if GPT's response is "ok", indicating the rough plan is sufficient
+//     return llmResponse.includes('ok') && llmResponse.length < 10;
+//   }
 
-  // Use iterateLlmQuery for the iterative confirmation process
-  await iterateLlmQuery(initialConfirmationQuery, refineRoughPlanQueryFunction, isRoughPlanSufficientFunction, systemPrompt, queryLlm);
-  return currentRoughPlan;
-}
+//   // Use iterateLlmQuery for the iterative confirmation process
+//   await iterateLlmQuery(initialConfirmationQuery, refineRoughPlanQueryFunction, isRoughPlanSufficientFunction, systemPrompt, queryLlm);
+//   return currentRoughPlan;
+// }
 
 function prepareRoughPlanQuery(taskDescription, summary, answers) {
   let query = `## Task Description\n${taskDescription}\n\n`;
@@ -54,29 +56,29 @@ function prepareRoughPlanQuery(taskDescription, summary, answers) {
   return query;
 }
 
-function prepareRoughPlanConfirmationQuery(roughPlan, taskDescription, summary, answers) {
-  let query = `## Rough Plan for Confirmation\n${roughPlan}\n\n`;
-  query += `## Task Description\n${taskDescription}\n\n`;
-  query += `## Summary\n${summary}\n\n`;
-  query += '## Tips\n';
-  for (const answer of answers) {
-    query += `  - ${answer.question}\n`;
-    query += `    - ${answer.answer}\n`;
-  }
+// function prepareRoughPlanConfirmationQuery(roughPlan, taskDescription, summary, answers) {
+//   let query = `## Rough Plan for Confirmation\n${roughPlan}\n\n`;
+//   query += `## Task Description\n${taskDescription}\n\n`;
+//   query += `## Summary\n${summary}\n\n`;
+//   query += '## Tips\n';
+//   for (const answer of answers) {
+//     query += `  - ${answer.question}\n`;
+//     query += `    - ${answer.answer}\n`;
+//   }
 
-  query += '## Confirmation Request\n';
-  query += 'Examine the above rough plan. Determine if it is sufficient and accurate for the task description and the summary. ';
-  query += 'Ensure the plan DOES NOT mention anything about environment setup or cloning the repo. ';
-  query += 'Ensure the plan DOES NOT mention anything about committing changes, deployment, code review, or documentation. ';
-  query += 'If it is sufficient, respond with "ok". If not, make edits where needed and provide a revised plan. ';
-  query += 'Revised plans will overwrite previous plans, and as such they must not refer to previous summary contents in any way.\n\n';
-  query += 'A revised plan should: \n';
-  query += '- Include a list of steps to follow.\n';
-  query += '- Include any additional information that would be helpful.\n';
-  query += '- Use Markdown formatting to enhance readability and structure.\n';
+//   query += '## Confirmation Request\n';
+//   query += 'Examine the above rough plan. Determine if it is sufficient and accurate for the task description and the summary. ';
+//   query += 'Ensure the plan DOES NOT mention anything about environment setup or cloning the repo. ';
+//   query += 'Ensure the plan DOES NOT mention anything about committing changes, deployment, code review, or documentation. ';
+//   query += 'If it is sufficient, respond with "ok". If not, make edits where needed and provide a revised plan. ';
+//   query += 'Revised plans will overwrite previous plans, and as such they must not refer to previous summary contents in any way.\n\n';
+//   query += 'A revised plan should: \n';
+//   query += '- Include a list of steps to follow.\n';
+//   query += '- Include any additional information that would be helpful.\n';
+//   query += '- Use Markdown formatting to enhance readability and structure.\n';
 
-  return query;
-}
+//   return query;
+// }
 
 const RoughPlannerSystemPrompt = `Your task as an expert software development strategist is to create a detailed coding plan for a junior developer. Assume that the developer's environment is already properly setup. Give instructions to guide on code-writing up until the code is ready to submit for PR. Do NOT include instructions for how to submit the PR. The plan will utilize provided key files, relevant code snippets, and a summary of the codebase, along with the user's original task.
 

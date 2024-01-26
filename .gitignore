@@ -1,3 +1,7 @@
+cloc2.sh
+.clocignore
+found.txt
+
 # Logs
 logs
 *.log

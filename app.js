@@ -1,6 +1,8 @@
 require('dotenv').config();  // Ensure environment variables are loaded
 const Koa = require('koa');
 const Router = require('@koa/router');
+const { OpenAI } = require('openai');
+const fs = require('fs');
 const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer, executeCommand } = require('./dockerOperations');
 const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
@@ -8,6 +10,8 @@ const { generateSummary } = require('./modules/summary');
 const { generatePlan } = require('./modules/plan');
 const { resolveTasks } = require('./modules/code');
 const { getRepoContext } = require('./modules/summary/codePicker');
+
+const openai = new OpenAI(process.env.OPENAI_API_KEY);
 
 setupDockerDirectory();
 
@@ -86,7 +90,7 @@ router.post('/generate-plan', async (ctx) => {
 router.post('/resolve-tasks', async (ctx) => {
   try {
     // task is json object & repoUrl is string
-    const { tasks, repoUrl } = ctx.request.body;
+    const { tasks, repoUrl, originalGoal } = ctx.request.body;
     const repoName = extractRepoName(repoUrl);
     // This is a hack for now:
     await executeCommand('git config user.name "qckfx Agent"', repoName);
@@ -94,7 +98,7 @@ router.post('/resolve-tasks', async (ctx) => {
     // Checkout new branch
     await executeCommand('git checkout -b agent-1', repoName);
     // Resolve tasks
-    const resolvedTasks = await resolveTasks(tasks, repoName);
+    const resolvedTasks = await resolveTasks(tasks, originalGoal, repoName);
     // Submit PR
     ctx.status = 200;
     ctx.body = { message: 'Tasks resolved successfully', tasks: resolvedTasks };
@@ -102,6 +106,19 @@ router.post('/resolve-tasks', async (ctx) => {
     console.error('Error in /resolve-tasks:', error);
     ctx.status = 500;
     ctx.body = { error: 'Error processing your request' };
+  }
+});
+
+router.post('/debug-only-send-payload', async (ctx) => {
+  try {
+    const { payloadPath } = ctx.request.body;
+    const payload = fs.readFileSync(payloadPath, 'utf8');
+    const jsonPayload = JSON.parse(payload);
+    const res = await openai.chat.completions.create(jsonPayload);
+    console.log(JSON.stringify(res));
+    ctx.response = res;
+  } catch (err) {
+    console.error(err);
   }
 });
 

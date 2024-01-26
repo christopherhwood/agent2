@@ -1,14 +1,15 @@
 const { queryLlmWithJsonCheck } = require('../../../../llmService');
 
-function createTasksFromIssue(issue, parentTask, diff) {
+async function createTasksFromIssue(issue, parentTask, diff) {
   const query = createQuery(issue, parentTask, diff);
-  const response = queryLlmWithJsonCheck([{role: 'system', content: TaskCreatorSystemPrompt}, {role: 'user', content: query}]);
+  const response = await queryLlmWithJsonCheck([{role: 'system', content: TaskCreatorSystemPrompt}, {role: 'user', content: query}]);
+  console.log(`Created tasks from issue\nIssue: ${JSON.stringify(issue)}}\nResponse: ${JSON.stringify(response.tasks)}`);
   return response.tasks;
 }
 
 const createQuery = (issue, parentTask, diff) => {
   let query = `# ${issue.title}\n`;
-  query += `${issue.description}\n\n`;
+  query += `${issue.body}\n\n`;
   query += '## Original Task\n';
   query += `### ${parentTask.title}\n`;
   query += `${parentTask.description}\n\n`;

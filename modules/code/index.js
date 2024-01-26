@@ -2,9 +2,9 @@ const { resolveCodingTask, Coder } = require('./codingTaskResolver');
 const { resolveNonCodingTask, NonCoder } = require('./nonCodingTaskResolver');
 const { executeCommand } = require('../../dockerOperations');
 
-async function resolveTasks(tasks, repoName) {
+async function resolveTasks(tasks, originalGoal, repoName) {
   const nonCoder = await NonCoder.Create(repoName);
-  const coder = new Coder(repoName);
+  const coder = new Coder(originalGoal, repoName);
 
   let resolvedTaskIds = [];
   let waitingTasks = [...tasks];
@@ -28,7 +28,7 @@ async function resolveTasks(tasks, repoName) {
           currentTask.relatedCommits = [...coderCommitDetails].join('\n');
         }
         
-        if (currentTask.pseudocode != 'N/A' && currentTask.pseudocode.length > 0) {
+        if (currentTask.pseudocode && currentTask.pseudocode.length > 0 && !currentTask.pseudocode.includes('N/A')) {
           await resolveCodingTask(currentTask, coder);
           // Get commit details from last task
           const commitDetails = await executeCommand(`git show ${currentTask.commitHash}`, repoName);

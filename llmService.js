@@ -1,6 +1,17 @@
 const { OpenAI } = require('openai');
+const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const openai = new OpenAI(process.env.OPENAI_API_KEY);
+
+const genBookmarkPath = () => {
+  const uuid = uuidv4().toString();
+  const tmpDir = os.tmpdir();
+  const bookmarkPath = path.join(tmpDir, `qckfx-agent-payload-${uuid}.json`);
+  return bookmarkPath;
+};
 
 /**
  * Queries GPT-4.
@@ -12,16 +23,21 @@ const openai = new OpenAI(process.env.OPENAI_API_KEY);
  * @throws Will throw an error if the query fails.
  */
 async function queryLlm(messages, temperature=0) {
-  console.log('messages:');
+  const bookmarkPath = genBookmarkPath();
+  console.log(bookmarkPath + ' messages:');
   console.log(messages);
+
+  const payload = {
+    model: 'gpt-4-0125-preview',
+    messages: messages,
+    max_tokens: 4096,
+    temperature: temperature,
+    top_p: 1,
+  };
+  
+  fs.writeFileSync(bookmarkPath, JSON.stringify(payload));
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-1106-preview',
-      messages: messages,
-      max_tokens: 4096,
-      temperature: temperature,
-      top_p: 1,
-    });
+    const response = await openai.chat.completions.create(payload);
 
     return response.choices[0].message.content;
   } catch (error) {
@@ -46,32 +62,37 @@ async function queryLlm(messages, temperature=0) {
  * @throws Will throw an error if the response is not in valid JSON format or if the validation function finds issues.
  */
 async function queryLlmWithJsonCheck(messages, validateJsonResponse, temperature=0, tries = 0) {
-  console.log('messages:');
+  const bookmarkPath = genBookmarkPath();
+  console.log(bookmarkPath + ' messages:');
   console.log(messages);
+
+  const payload = {
+    model: 'gpt-4-0125-preview',
+    messages: messages,
+    max_tokens: 4096,
+    temperature: temperature,
+    top_p: 1,
+    response_format: {type: 'json_object'}
+  };
+  fs.writeFileSync(bookmarkPath, JSON.stringify(payload));
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-1106-preview',
-      messages: messages,
-      max_tokens: 4096,
-      temperature: temperature,
-      top_p: 1,
-      response_format: {type: 'json_object'}
-    });
+    const response = await openai.chat.completions.create(payload);
 
     let jsonResponse;
+    console.log('JSON response: ' + response.choices[0].message.content);
     try {
       jsonResponse = JSON.parse(response.choices[0].message.content);
+
+      // Apply dynamic validation passed as a parameter
+      if (validateJsonResponse && typeof validateJsonResponse === 'function') {
+        return validateJsonResponse(jsonResponse);
+      }
     } catch (jsonError) {
       console.error('Error parsing JSON response from LLM:', jsonError, 'Content: ', response.choices[0].message.content);
       if (tries < 3) {
-        return await queryLlmWithJsonCheck([...messages, {role: 'assistant', content: JSON.stringify({content: response.choices[0].message.content})}, {role: 'user', content: 'You must provide a valid JSON response.'}], validateJsonResponse, temperature, tries + 1);
+        return await queryLlmWithJsonCheck([...messages, response.choices[0].message, {role: 'user', content: 'You must provide a valid JSON response. ' + jsonError}], validateJsonResponse, temperature, tries + 1);
       }
       throw new Error('Received ill-formatted JSON response from LLM.');
-    }
-
-    // Apply dynamic validation passed as a parameter
-    if (validateJsonResponse && typeof validateJsonResponse === 'function') {
-      return validateJsonResponse(jsonResponse);
     }
 
     return jsonResponse;
@@ -87,31 +108,36 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse, temperature
 }
 
 async function queryLlmWTools(messages, tools, toolRouter, temperature, tries = 0) {
-  console.log('messages:');
+  const bookmarkPath = genBookmarkPath();
+  console.log(bookmarkPath + ' messages:');
   console.log(messages);
   console.log('tools:');
   console.log(tools);
+  const payload = {
+    model: 'gpt-4-0125-preview',
+    messages: messages,
+    max_tokens: 4096,
+    temperature: temperature,
+    top_p: 1,
+    tools: tools,
+    tool_choice: 'auto'
+  };
+  fs.writeFileSync(bookmarkPath, JSON.stringify(payload));
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-1106-preview',
-      messages: messages,
-      max_tokens: 4096,
-      temperature: temperature,
-      top_p: 1,
-      tools: tools,
-      tool_choice: 'auto'
-    });
+    const response = await openai.chat.completions.create(payload);
 
     console.log('LLM Tool Assistant Message: ' + JSON.stringify(response.choices[0].message));
 
-    const toolCalls = response.choices[0].message.tool_calls;
+    let toolCalls = response.choices[0].message.tool_calls;
     let toolCallResponses = [];
     if (toolCalls && toolCalls.length > 0) {
       if (toolCalls[0].function.name === 'pass') {
         return response.choices[0].message.content;
       }
+      // Filter out any tool calls that don't match toolcall regexp: ^[a-zA-Z0-9_-]{1,64}$
+      toolCalls = toolCalls.filter(toolCall => /^[a-zA-Z0-9_-]{1,64}$/.test(toolCall.function.name));
       
-      toolCallResponses = toolCalls.map(toolCall => {
+      toolCallResponses = await Promise.allSettled(toolCalls.map(async toolCall => {
         let response = {
           tool_call_id: toolCall.id,
           role: 'tool',
@@ -128,7 +154,7 @@ async function queryLlmWTools(messages, tools, toolRouter, temperature, tries = 
         
         let output;
         try {
-          output = toolRouter.routeToolCall({function: toolCall.function.name, arguments: args});
+          output = await toolRouter.routeToolCall({function: toolCall.function.name, arguments: args, id: toolCall.id});
         } catch (err) {
           response.content = `Error executing tool call ${toolCall.function.name}: ${err}`;
           return response;
@@ -136,9 +162,18 @@ async function queryLlmWTools(messages, tools, toolRouter, temperature, tries = 
         
         response.content = output;
         return response;
-      });
+      }));
 
-      return await queryLlmWTools([...messages, response.choices[0].message, ...toolCallResponses], tools, toolRouter, temperature, tries);
+      toolCallResponses = toolCallResponses.map(toolCallResponse => toolCallResponse.value);
+
+      const lastMessageWithBadToolCallsFiltered = response.choices[0].message;
+      lastMessageWithBadToolCallsFiltered.tool_calls = toolCalls;
+
+      // If the last message is now invalid, then we just remove it and retry.
+      if (!lastMessageWithBadToolCallsFiltered.content && (!toolCalls || toolCalls.length === 0)) {
+        return await queryLlmWTools(messages, tools, toolRouter, temperature, tries);
+      }
+      return await queryLlmWTools([...messages, lastMessageWithBadToolCallsFiltered, ...toolCallResponses], tools, toolRouter, temperature, tries);
     }
     
     return response.choices[0].message;
@@ -147,27 +182,31 @@ async function queryLlmWTools(messages, tools, toolRouter, temperature, tries = 
     if (error.status === 429) {
       // wait 15 seconds and try again
       await new Promise(resolve => setTimeout(resolve, 15000));
-      return await queryLlmWTools(messages, tools, temperature, tries);
+      return await queryLlmWTools(messages, tools, toolRouter, temperature, tries);
     }
     throw error;
   }
 }
 
 async function queryLlmWithTools(messages, tools, temperature, forceToolChoice = true, tries = 0) {
-  console.log('messages:');
+  const bookmarkPath = genBookmarkPath();
+  console.log(bookmarkPath + ' messages:');
   console.log(messages);
   console.log('tools:');
   console.log(tools);
+  
+  const payload = {
+    model: 'gpt-4-0125-preview',
+    messages: messages,
+    max_tokens: 4096,
+    temperature: temperature,
+    top_p: 1,
+    tools: tools,
+    tool_choice: 'auto'
+  };
+  fs.writeFileSync(bookmarkPath, JSON.stringify(payload));
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-1106-preview',
-      messages: messages,
-      max_tokens: 4096,
-      temperature: temperature,
-      top_p: 1,
-      tools: tools,
-      tool_choice: 'auto'
-    });
+    const response = await openai.chat.completions.create(payload);
 
     console.log('LLM Tool Assistant Message: ' + JSON.stringify(response.choices[0].message));
     let toolCalls = response.choices[0].message.tool_calls;

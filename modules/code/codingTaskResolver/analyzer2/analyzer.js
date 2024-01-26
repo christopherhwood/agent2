@@ -19,7 +19,15 @@ class Analyzer {
   }
 
   async grep(pattern) {
-    const grepResult = await this.container.executeCommand(`grep -r ${pattern} .`);
+    const escapeAndQuotePattern = (pattern) => {
+      // Escape single quotes by replacing them with '\''
+      const escapedPattern = pattern.replace(/'/g, '\\\'');
+    
+      // Wrap the escaped pattern in single quotes
+      return `'${escapedPattern}'`;
+    };
+
+    const grepResult = await this.container.executeCommand(`git ls-files | xargs grep ${escapeAndQuotePattern(pattern)}`);
     return grepResult;
   }
 
