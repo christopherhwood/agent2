@@ -96,6 +96,7 @@ const getGrepPatternForFilePath = (filePath) => {
   const fileName = pathParts[pathParts.length - 1];
   let patterns = [`'${fileName}'\\'')'`];
   if (fileName.endsWith('index.js')) {
+    patterns = [`'${pathParts[pathParts.length - 2]}/index.js'\\'')'`];
     const directoryName = pathParts[pathParts.length - 2];
     patterns.push(`'${directoryName}'\\'')'`);
   } else {

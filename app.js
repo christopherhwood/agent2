@@ -5,15 +5,13 @@ const { OpenAI } = require('openai');
 const fs = require('fs');
 const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer, executeCommand } = require('./dockerOperations');
-const { setupDockerDirectory, ensureGitSuffix, extractRepoName } = require('./utils');
+const { ensureGitSuffix, extractRepoName } = require('./utils');
 const { generateSummary } = require('./modules/summary');
 const { generatePlan } = require('./modules/plan');
 const { resolveTasks } = require('./modules/code');
 const { getRepoContext } = require('./modules/summary/codePicker');
 
 const openai = new OpenAI(process.env.OPENAI_API_KEY);
-
-setupDockerDirectory();
 
 const app = new Koa();
 const router = new Router();

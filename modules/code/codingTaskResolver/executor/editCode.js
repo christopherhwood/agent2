@@ -1,15 +1,38 @@
 const { queryLlmWithJsonCheck } = require('../../../../llmService');
 const { Container, executeCommand } = require('../../../../dockerOperations');
+const { v4: uuidv4 } = require('uuid');
 
-async function editCode(filePath, spec, repoName, uniqueId) {
+async function editCode(filePath, spec, repoName) {
+  await editCodeLoop(filePath, spec, [], repoName);
+}
+
+async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining = 3) {
+  const edit = await sendEditCodeRequest(filePath, spec, messages, repoName);
+  try {
+    return await tryToEditCode(filePath, edit, repoName);
+  } catch (err) {
+    console.log('Error editing code', err);
+    if (triesRemaining > 0) {
+      return await editCodeLoop(filePath, spec, [...messages, {role: 'assistant', content: JSON.stringify(edit)}, {role: 'user', content: err.message}], repoName, triesRemaining - 1);
+    }
+  }
+}
+
+async function sendEditCodeRequest(filePath, spec, messages, repoName) {
   const editQuery = await query(filePath, repoName);
-  const edit = await queryLlmWithJsonCheck([{role: 'system', content: createEditCodeSystemPrompt(spec)}, {role: 'user', content: editQuery}], validateEditCode);
+  const edit = await queryLlmWithJsonCheck([{role: 'system', content: createEditCodeSystemPrompt(spec)}, {role: 'user', content: editQuery}, ...messages], validateEditCode);
+  return edit;
+}
 
+async function tryToEditCode(filePath, edit, repoName) {
+  const uniqueId = uuidv4().toString();
   if (edit.originalCode && edit.newCode) {
-    // Replace line breaks in original code with \n
-    const originalCode = edit.originalCode.replace(/\\n/g, '\n');
-    // Replace line breaks in new code with \n
-    const newCode = edit.newCode.replace(/\\n/g, '\n');
+    const originalCode = edit.originalCode;
+    const newCode = edit.newCode;
+    // // Replace line breaks in original code with \n
+    // const originalCode = edit.originalCode.replace(/\\n/g, '\n');
+    // // Replace line breaks in new code with \n
+    // const newCode = edit.newCode.replace(/\\n/g, '\n');
 
     // Create a container
     const container = await Container.Create(repoName);
@@ -32,7 +55,7 @@ async function editCode(filePath, spec, repoName, uniqueId) {
           if (originalCode.includes('//') || originalCode.includes('/*')) {
             output += '\n\n**IMPORTANT**: The code you provided to be replaced did not match. The snippet contains comments. Please make sure the comments match _exactly_ what is in the source file. Otherwise, the command will fail.';
           }
-          return output;
+          throw new Error(output);
         }
       } else {
         output = '# Success\nThe file\'s contents are:';
@@ -43,7 +66,7 @@ async function editCode(filePath, spec, repoName, uniqueId) {
     }
     return 'File edited successfully';
   }
-  return 'Error: File not edited - invalid contents';
+  throw new Error('Error: File not edited - invalid contents');
 }
 
 const validateEditCode = (response) => {

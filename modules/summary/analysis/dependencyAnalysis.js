@@ -124,7 +124,7 @@ async function getAllPotentialDependencyImportPathGrepPatterns(pathRelativeToRoo
     jsPath += '.js';
   }
   const contents = await executeCommand(`cat ${jsPath}`, repoName);
-  if (!contents.includes('No such file or directory') && !contents.includes('Is a directory')) {
+  if (contents.length > 25 || (!contents.includes('No such file or directory') && !contents.includes('Is a directory'))) {
     const jsPathComponents = jsPath.split('/');
     if (jsPathComponents[jsPathComponents.length - 1] === 'index.js' && jsPathComponents.length > 1) {
       // i.e. modules/code/codingTaskResolver/index.js
