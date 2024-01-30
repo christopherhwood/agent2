@@ -107,7 +107,7 @@ async function queryLlmWithJsonCheck(messages, validateJsonResponse, temperature
   }
 }
 
-async function queryLlmWTools(messages, tools, toolRouter, temperature, tries = 0) {
+async function queryLlmWTools(messages, tools, toolRouter, forceToolSelection = false, temperature = 0, tries = 0) {
   const bookmarkPath = genBookmarkPath();
   console.log(bookmarkPath + ' messages:');
   console.log(messages);
@@ -128,11 +128,13 @@ async function queryLlmWTools(messages, tools, toolRouter, temperature, tries = 
 
     console.log('LLM Tool Assistant Message: ' + JSON.stringify(response.choices[0].message));
 
+    messages.push(response.choices[0].message);
+
     let toolCalls = response.choices[0].message.tool_calls;
     let toolCallResponses = [];
     if (toolCalls && toolCalls.length > 0) {
       if (toolCalls[0].function.name === 'pass') {
-        return response.choices[0].message.content;
+        return messages;
       }
       // Filter out any tool calls that don't match toolcall regexp: ^[a-zA-Z0-9_-]{1,64}$
       toolCalls = toolCalls.filter(toolCall => /^[a-zA-Z0-9_-]{1,64}$/.test(toolCall.function.name));
@@ -166,23 +168,31 @@ async function queryLlmWTools(messages, tools, toolRouter, temperature, tries = 
 
       toolCallResponses = toolCallResponses.map(toolCallResponse => toolCallResponse.value);
 
+      // Validate the tool calls in the message
+      messages.pop();
       const lastMessageWithBadToolCallsFiltered = response.choices[0].message;
       lastMessageWithBadToolCallsFiltered.tool_calls = toolCalls;
 
       // If the last message is now invalid, then we just remove it and retry.
       if (!lastMessageWithBadToolCallsFiltered.content && (!toolCalls || toolCalls.length === 0)) {
-        return await queryLlmWTools(messages, tools, toolRouter, temperature, tries);
+        return await queryLlmWTools(messages, tools, toolRouter, forceToolSelection, temperature, tries);
       }
-      return await queryLlmWTools([...messages, lastMessageWithBadToolCallsFiltered, ...toolCallResponses], tools, toolRouter, temperature, tries);
+      messages.push(lastMessageWithBadToolCallsFiltered, ...toolCallResponses);
+      return await queryLlmWTools(messages, tools, toolRouter, forceToolSelection, temperature, tries);
+    } else if (forceToolSelection) {
+      messages.push({role: 'user', content: 'You must use at least one tool in your response.'});
+      return await queryLlmWTools(messages, tools, toolRouter, forceToolSelection, temperature, tries);
     }
+      
     
-    return response.choices[0].message;
+    messages.push(response.choices[0].message);
+    return messages;
   } catch (error) {
     console.error('Error querying LLM:', error);
     if (error.status === 429) {
       // wait 15 seconds and try again
       await new Promise(resolve => setTimeout(resolve, 15000));
-      return await queryLlmWTools(messages, tools, toolRouter, temperature, tries);
+      return await queryLlmWTools(messages, tools, toolRouter, forceToolSelection, temperature, tries);
     }
     throw error;
   }

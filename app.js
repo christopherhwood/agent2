@@ -90,7 +90,7 @@ router.post('/generate-plan', async (ctx) => {
 router.post('/resolve-tasks', async (ctx) => {
   try {
     // task is json object & repoUrl is string
-    const { tasks, repoUrl, originalGoal } = ctx.request.body;
+    const { tasks, repoUrl, originalGoal, problemStatement } = ctx.request.body;
     const repoName = extractRepoName(repoUrl);
     // This is a hack for now:
     await executeCommand('git config user.name "qckfx Agent"', repoName);
@@ -98,7 +98,7 @@ router.post('/resolve-tasks', async (ctx) => {
     // Checkout new branch
     await executeCommand('git checkout -b agent-1', repoName);
     // Resolve tasks
-    const resolvedTasks = await resolveTasks(tasks, originalGoal, repoName);
+    const resolvedTasks = await resolveTasks(tasks, originalGoal, problemStatement, repoName);
     // Submit PR
     ctx.status = 200;
     ctx.body = { message: 'Tasks resolved successfully', tasks: resolvedTasks };
