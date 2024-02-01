@@ -11,6 +11,10 @@ class DirectoryExplorer {
     const lsOutput = await this.executeCommand(`ls -l ${directory}`);
     const lsLines = lsOutput.split('\n');
     for (const line of lsLines) {
+      // skip empty lines or lines that match the format 'total x' 
+      if (line.trim() === '' || line.trim().match(/^total\s+\d+$/)) {
+        continue;
+      }
       try {
         const {fileName, isDirectory} = parseLsLine(line);
         const gitIgnoreName = isDirectory ? fileName + '/' : fileName;
@@ -23,7 +27,7 @@ class DirectoryExplorer {
           files.push(fileName);
         }
       } catch (error) {
-        console.log(error);
+        console.error(error);
       }
     }
     return {directories, files};

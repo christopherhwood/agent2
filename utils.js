@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 function ensureGitSuffix(url) {
   if (!url.endsWith('.git')) {
     return url + '.git';
@@ -16,5 +18,8 @@ function extractRepoName(gitRepoUrl) {
   return repoName;
 }
 
-module.exports = { ensureGitSuffix, extractRepoName };
+function hashText(contents) {
+  return crypto.createHash('sha256').update(contents).digest('hex');
+}
 
+module.exports = { ensureGitSuffix, extractRepoName, hashText };

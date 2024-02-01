@@ -2,6 +2,7 @@ const { generateSpec } = require('./specCreator');
 const { addFile } = require('./addFile');
 const { deleteFile } = require('./deleteFile');
 const { editCode } = require('./editCode');
+const { cleanUpCode } = require('./cleanUpCode');
 
 async function executeTask(task, problemStatement, coder) {
   const spec = await generateSpec(task, problemStatement);
@@ -15,6 +16,8 @@ async function executeTask(task, problemStatement, coder) {
   for (const filePath of spec.filesToChange) {
     const res = await editCode(filePath, spec, coder.repoName);
     console.log('Edit Code Result: ', res);
+    const res2 = await cleanUpCode(filePath, coder.repoName);
+    console.log('Clean Up Code Result: ', res2);
   }
   for (const filePath of spec.filesToDelete) {
     const res = await deleteFile(filePath, coder.repoName);

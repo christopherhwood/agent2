@@ -7,13 +7,21 @@ async function editCode(filePath, spec, repoName) {
 }
 
 async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining = 3) {
-  const edit = await sendEditCodeRequest(filePath, spec, messages, repoName);
-  try {
-    return await tryToEditCode(filePath, edit, repoName);
-  } catch (err) {
-    console.log('Error editing code', err);
+  const edits = await sendEditCodeRequest(filePath, spec, messages, repoName);
+  for (const edit of edits) {
+    try {
+      return await tryToEditCode(filePath, edit, repoName);
+    } catch (err) {
+      edit.error = err.message;
+    }
+  }
+
+  const errorEdits = edits.filter(edit => edit.error);
+  if (errorEdits.length > 0) {
     if (triesRemaining > 0) {
-      return await editCodeLoop(filePath, spec, [...messages, {role: 'assistant', content: JSON.stringify(edit)}, {role: 'user', content: err.message}], repoName, triesRemaining - 1);
+      return await editCodeLoop(filePath, spec, [...messages, {role: 'assistant', content: JSON.stringify(edits)}, {role: 'user', content: `A few of your edits had errors. Please correct them.\n\`\`\`json\n${edits}\n\`\`\``}], repoName, triesRemaining - 1);
+    } else {
+      console.log('Unfixed error edits:\n', errorEdits);
     }
   }
 }
@@ -88,7 +96,20 @@ const query = async (filePath, repoName) => {
 
 const createEditCodeSystemPrompt = (spec) => {return `You are a senior software engineer working on a programming task. You are provided a file path identifying the file that we are editing, and an engineering spec for a task.
 
-Your job is to write the javascript code for the new file. You will return it in json format: \`{ originalCode: '', newCode: '' }\`. The newCode will replace the originalCode, meaning that the originalCode will be completely removed and the newCode will be copied directly as written, including any comments, verbatim. Do not include anything you wouldn't want to appear in the committed code.
+Your job is to write the javascript code for the new file. Your output will be structured as follows, detailing the edits you propose:
+\`\`\`json
+{
+  "edits": [
+    {
+      "originalCode": "Exact subsection of the original code to be replaced",
+      "newCode": "The revised code snippet that corrects the identified issue"
+    },
+    // Additional edits as necessary
+  ]
+}
+\`\`\`
+
+The newCode will replace the originalCode, meaning that the originalCode will be completely removed and the newCode will be copied directly as written, including any comments, verbatim. Do not include anything you wouldn't want to appear in the committed code.
 
 Be wary when editing functions that are currently in use. If you change the function signature, you will need to update all calls to that function. If you change the function body, you will need to ensure that the new code does not break any existing functionality. It may be easier sometimes to create a new function that accomplishes your goals rather than trying to edit an existing function. However, bare in mind that this will increase the amount of code in the codebase and the maintenance burden.
 
@@ -103,4 +124,4 @@ The engineering spec is below:
 ${JSON.stringify(spec)}
 \`\`\``;};
 
-module.exports = { editCode };
+module.exports = { editCode, tryToEditCode };

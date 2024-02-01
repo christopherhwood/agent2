@@ -10,8 +10,12 @@ const { generateSummary } = require('./modules/summary');
 const { generatePlan } = require('./modules/plan');
 const { resolveTasks } = require('./modules/code');
 const { getRepoContext } = require('./modules/summary/codePicker');
+const { connectDB } = require('./modules/db/db');
+const { updateRepoEmbeddings } = require('./modules/search/ingestion/traverseRepo');
+const { pickCodeContext } = require('./modules/search/output');
 
 const openai = new OpenAI(process.env.OPENAI_API_KEY);
+connectDB();
 
 const app = new Koa();
 const router = new Router();
@@ -95,6 +99,9 @@ router.post('/resolve-tasks', async (ctx) => {
     await executeCommand('git config user.email "chris.wood@earlyworm.io"', repoName);
     // Checkout new branch
     await executeCommand('git checkout -b agent-1', repoName);
+
+    // Re-index the repo
+    await updateRepoEmbeddings(repoName);
     // Resolve tasks
     const resolvedTasks = await resolveTasks(tasks, originalGoal, problemStatement, repoName);
     // Submit PR
@@ -115,6 +122,18 @@ router.post('/debug-only-send-payload', async (ctx) => {
     const res = await openai.chat.completions.create(jsonPayload);
     console.log(JSON.stringify(res));
     ctx.response = res;
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+router.post('/debug-only-search-code', async (ctx) => {
+  try {
+    const { query, problemStatement, repoUrl } = ctx.request.body;
+    const repoName = extractRepoName(repoUrl);
+    await updateRepoEmbeddings(repoName);
+    const context = await pickCodeContext(query, problemStatement, repoName, true);
+    return ctx.response.body = context;
   } catch (err) {
     console.error(err);
   }

@@ -2,6 +2,7 @@
 // const { createTasksFromIssue } = require('./analyzer2/issueTaskCreator');
 const { executeTask } = require('./executor/executeTask');
 const Coder = require('./executor/coder');
+const { updateRepoEmbeddings } = require('../../search/ingestion/traverseRepo');
 // const { decideToContinue } = require('./analyzer2/taskReviser');
 
 async function resolveCodingTask(task, problemStatement, coder) {
@@ -36,6 +37,8 @@ async function resolveCodingTask(task, problemStatement, coder) {
   if (!task.isIssue) {
     // Commit changes and return
     await coder.commitChanges(task);
+    // refresh embeddings after commit
+    await updateRepoEmbeddings(coder.repoName);
     return;
   }
 }
