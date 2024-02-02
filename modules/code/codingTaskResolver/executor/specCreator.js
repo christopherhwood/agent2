@@ -37,6 +37,8 @@ Use markdown for your spec. Write the spec as you see fit, but it's recommended 
 
 Be wary when suggesting to change or delete functions that are currently in use. If you change the function signature, you will need to update all calls to that function. If you change the function body, you will need to ensure that the new code does not break any existing functionality. If you delete a function you will need to ensure all of its call locations are removed from the codebase. It may be easier sometimes to create a new function that accomplishes your goals rather than trying to change an existing function. However, bare in mind that this will increase the amount of code in the codebase and the maintenance burden.
 
+In your response, just return straight markdown, no need to wrap your response in backticks.
+
 Below is an example of spec generation.
 
 ## Input

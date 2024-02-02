@@ -52,6 +52,7 @@ async function selectRelatedCode(repoName, embedding, limit = 10) {
         } else {
           fileContextMap[code.filePath] = [chunk.text];
         }
+        break;
       }
     }
   }

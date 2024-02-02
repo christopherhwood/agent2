@@ -10,7 +10,7 @@ async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining =
   const edits = await sendEditCodeRequest(filePath, spec, messages, repoName);
   for (const edit of edits) {
     try {
-      return await tryToEditCode(filePath, edit, repoName);
+      await tryToEditCode(filePath, edit, repoName);
     } catch (err) {
       edit.error = err.message;
     }
@@ -19,7 +19,7 @@ async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining =
   const errorEdits = edits.filter(edit => edit.error);
   if (errorEdits.length > 0) {
     if (triesRemaining > 0) {
-      return await editCodeLoop(filePath, spec, [...messages, {role: 'assistant', content: JSON.stringify(edits)}, {role: 'user', content: fixErrorQuery(edits)}], repoName, triesRemaining - 1);
+      await editCodeLoop(filePath, spec, [...messages, {role: 'assistant', content: JSON.stringify(edits)}, {role: 'user', content: fixErrorQuery(edits)}], repoName, triesRemaining - 1);
     } else {
       console.log('Unfixed error edits:\n', errorEdits);
     }
@@ -127,6 +127,8 @@ Your job is to write the javascript code for the new file. Your output will be s
 \`\`\`
 
 The newCode will replace the originalCode, meaning that the originalCode will be completely removed and the newCode will be copied directly as written, including any comments, verbatim. Be careful about what code is deleted. Only make changes as directed in the spec, do not go off script. Do not include anything in the newCode you wouldn't want to appear in the committed code.
+
+Only write code you are confident about. Be especially careful about assuming the properties of objects unless you know the properties for sure. In the case of adding validations, it's better to add less and be correct than to add more and be incorrect.
 
 Be wary when editing functions that are currently in use. If you change the function signature, you will need to update all calls to that function. If you change the function body, you will need to ensure that the new code does not break any existing functionality. It may be easier sometimes to create a new function that accomplishes your goals rather than trying to edit an existing function. However, bare in mind that this will increase the amount of code in the codebase and the maintenance burden.
 

@@ -1,4 +1,4 @@
-const { executeCommand } = require('../../../../dockerOperations.js');
+const { Container, executeCommand } = require('../../../../dockerOperations.js');
 const { cleanUpCode } = require('./cleanUpCode');
 
 const { queryLlmWTools, queryLlm } = require('../../../../llmService.js');
@@ -27,14 +27,21 @@ class Coder {
       console.log('lastMessage', JSON.stringify(lastMessage));
       const lastToolCallId = lastMessage.tool_calls[0].id;
       console.log('lastToolCallId', lastToolCallId);
-      const commitMessage = await queryLlm([{role: 'system', content: `You are a tech lead software engineer overseeing the completion of the following task and tech spec:\n**Task:**\n\`\`\`json\n${JSON.stringify(this.task)}\n\`\`\`\n\n**Spec:**\n\`\`\`markdown\n${this.spec}\`\`\``}, ...messages.splice(1), {role: 'tool', tool_call_id: lastToolCallId, name: 'pass', content: 'Please give a commit message for the changes you made. Use markdown to describe the changes in detail.'}]);
+      const commitMessage = await queryLlm([{role: 'system', content: `You are a tech lead software engineer overseeing the completion of the following task and tech spec:\n**Task:**\n\`\`\`json\n${JSON.stringify(this.task)}\n\`\`\`\n\n**Spec:**\n\`\`\`markdown\n${this.spec}\`\`\``}, ...messages.splice(1), {role: 'tool', tool_call_id: lastToolCallId, name: 'pass', content: 'Please give a commit message for the changes you made. You may use markdown to describe the changes, but keep the message concise and useful. Just write straight markdown, no need to wrap it in backticks.'}]);
       this.commitChanges(commitMessage);
     }
   }
 
   async commitChanges(message) {
+    // Create a container
+    const container = await Container.Create(this.repoName);
+
+    // Echo the code to a temp file in the container
+    await container.executeCommand(`cat << 'EOF' > /usr/src/temp-commit\n${message}\nEOF`);
+
     // Commit the changes to git  
-    await executeCommand(`git add . && git commit -m  "${message}"`, this.repoName);
+    await container.executeCommand('git add . && git commit -F  "/usr/src/temp-commit"');
+    await container.destroy();
   }
   
   async createFile(path, spec) {
@@ -86,7 +93,7 @@ class Coder {
               },
               spec: {
                 type: 'string',
-                description: 'A focused spec for this edit. This should be in markdown format and provide all of the details necessary for the editor to carry out the edit as intended. Make the best attempt to be overly detailed, but don\'t speculate or guess about the code. If unsure, indicate that in the spec and provide optionality for the editor to adjust based on the state of the code.'
+                description: 'A focused spec for the code to add to the new file. This should be in markdown format and provide instructions for your teammate who will carry out the new file creation. As you have not seen the code yet, avoid making specific code suggestions. Be especially careful about assuming the properties of objects unless you know the properties for sure. In the case of adding validations, it\'s better to add less and be correct than to add more and be incorrect. If unsure about how to carry out the intended edit, indicate that in the spec and provide optionality for the editor to adjust based on the state of the code.'
               }
             },
             required: ['path', 'spec']
@@ -124,7 +131,7 @@ class Coder {
               },
               spec: {
                 type: 'string',
-                description: 'A focused spec for this edit. This should be in markdown format and provide all of the details necessary for the editor to carry out the edit as intended. Make the best attempt to be overly detailed, but try to keep instructions at a high level so that the editor has room to make judgement calls based on the existing code. If unsure about how to carry out the intended edit, indicate that in the spec and provide optionality for the editor to adjust based on the state of the code.'
+                description: 'A focused spec for this edit. This should be in markdown format and provide instructions for your teammate who will carry out the edit. As you have not seen the code yet, avoid making specific code suggestions. Be especially careful about assuming the properties of objects unless you know the properties for sure. In the case of adding validations, it\'s better to add less and be correct than to add more and be incorrect. If unsure about how to carry out the intended edit, indicate that in the spec and provide optionality for the editor to adjust based on the state of the code.'
               },
             },
             required: ['path', 'spec']
