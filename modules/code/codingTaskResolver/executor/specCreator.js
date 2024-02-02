@@ -45,7 +45,11 @@ Your job is to output an engineering spec to resolve this task. Discuss how data
 
 Justify suggestions to delete, add, or change files. Don't expect the junior engineers to be able to guess your intent. More details here are critical to see your plan carried out correctly. When in doubt, add more detail.
 
-Use json for your spec. The json must include the following fields: {filesToChange: [''], filesToAdd: [''], filesToDelete: ['']} where filesToChange is a list of files that will be impacted by the coding changes in the spec, filesToAdd and filesToDelete are self-explanatory. You may write the rest of the json spec however you see fit.
+Keep the spec as simple as possible, try to achieve the task with minimal complexity. Interpret and follow the task strictly, don't add any extra functionality that is not required by the task.
+
+Be extremely cautious recommending actions around api endpoints, database queries, or function calls. Any integration point like this should only be altered if absolutely required by the task. And in those cases, do the minimal changes necessary. These parts of the system are the most fragile and the most likely to break.
+
+Use markdown for your spec. Write the spec as you see fit, but it's recommended to call out where new files may need to be added, which files should be considered for editing, and whether there is need for integrations with existing internal code or potentially third-party or open source code. When referencing specific files, use paths relative to the root of the repository.
 
 Be wary when suggesting to change or delete functions that are currently in use. If you change the function signature, you will need to update all calls to that function. If you change the function body, you will need to ensure that the new code does not break any existing functionality. If you delete a function you will need to ensure all of its call locations are removed from the codebase. It may be easier sometimes to create a new function that accomplishes your goals rather than trying to change an existing function. However, bare in mind that this will increase the amount of code in the codebase and the maintenance burden.
 
@@ -95,57 +99,94 @@ The \\\`agent2\\\` repository, designed to automate software development workflo
 \`\`\`
 
 ## Output
-\`\`\`json
-{
-  "filesToChange": ["./modules/code/codingTaskResolver/executor/coder.js"],
-  "filesToAdd": ["./modules/code/commitMessageModule/index.js"],
-  "filesToDelete": ["./commitMessageGenerator.js"],
-  "module": {
-    "name": "CommitMessageModule",
-    "location": "./modules/code/commitMessageModule",
-    "description": "Handles generation of detailed commit messages.",
-    "functions": {
-      "generateCommitMessage": {
-        "description": "Generates a detailed commit message based on task details and code changes.",
-        "inputs": {
-          "taskDetails": {
-            "type": "object",
-            "source": "Passed as an argument from Coder class's commitChanges method.",
-            "structure": {
-              "title": "string",
-              "description": "string",
-              "commitHash": "string (optional, added after commit)"
-            }
-          },
-          "codeChanges": {
-            "type": "string",
-            "source": "Generated or retrieved within Coder class, representing a summary or diff of code changes."
-          }
-        },
-        "output": {
-          "type": "string",
-          "description": "Formatted commit message."
-        }
-      }
-    }
-  },
-  "coderClassChanges": {
-    "filePath": "./modules/code/codingTaskResolver/executor/coder.js",
-    "changes": {
-      "importCommitMessageModule": {
-        "description": "Import the new CommitMessageModule."
-      },
-      "modifyCommitChangesMethod": {
-        "description": "Update to use CommitMessageModule for generating commit messages.",
-        "newLogic": {
-          "generateCommitMessage": {
-            "description": "Call CommitMessageModule.generateCommitMessage with appropriate arguments."
-          }
-        }
-      }
-    }
+\\\`\\\`\\\`markdown
+# Engineering Spec for Commit Message Generation Module
+
+## Overview
+
+This document specifies the development of a new module for generating commit messages within the \`agent2\` repository. The aim is to provide a structured and enhanced approach to commit message creation, leveraging task details and code changes, and to seamlessly integrate with the existing \`Coder\` class.
+
+## Objectives
+
+- Implement a module for detailed and formatted commit message generation.
+- Integrate this new module with the \`Coder\` class to improve commit operations.
+- Limit modifications to existing APIs, database queries, or function calls to ensure system stability.
+
+## Module Structure and Changes
+
+### New Files
+
+- **\`./modules/commitMessageGenerator/index.js\`**: The main module file with commit message generation logic.
+- **\`./modules/commitMessageGenerator/messageFormatter.js\`**: A helper file for commit message formatting.
+
+### Modifications
+
+- **\`./modules/code/codingTaskResolver/executor/coder.js\`**: To integrate the new commit message generation module.
+- **\`./commitMessageGenerator.js\`**: To be deprecated or refactored into the new module.
+
+## Data Flow and Interfaces
+
+### Commit Message Generator (\`./modules/commitMessageGenerator/index.js\`)
+
+\\\\\`\\\\\`\\\\\`javascript
+const { formatCommitMessage } = require('./messageFormatter');
+
+class CommitMessageGenerator {
+  generate(taskDetails, codeChanges) {
+    return formatCommitMessage(taskDetails, codeChanges);
   }
 }
+
+module.exports = CommitMessageGenerator;
+\\\\\`\\\\\`\\\\\`
+
+### Message Formatter (./modules/commitMessageGenerator/messageFormatter.js)
+
+\\\\\`\\\\\`\\\\\`javascript
+function formatCommitMessage(taskDetails, codeChanges) {
+  const commitMessage = \`Task: \${taskDetails.title}\nDescription: \${taskDetails.description}\nChanges: \${codeChanges}\`;
+  return commitMessage;
+}
+
+module.exports = { formatCommitMessage };
+\\\\\`\\\\\`\\\\\`
+
+### Integration with Coder Class (./modules/code/codingTaskResolver/executor/coder.js)
+
+Integrate the commit message generation logic by replacing the current method with a call to \`CommitMessageGenerator\`.
+
+\\\\\`\\\\\`\\\\\`javascript
+const CommitMessageGenerator = require('../../../commitMessageGenerator');
+
+class Coder {
+  // ...
+  async commitChanges(task) {
+    const container = await createContainer(this.repoName);
+    const commitMessageGenerator = new CommitMessageGenerator();
+    const commitMessage = commitMessageGenerator.generate(task, "Code changes details...");
+
+    await executeCommand(\`git add . && git commit -m "\${commitMessage}"\`, this.repoName, container);
+
+    task.commitHash = await executeCommand('git rev-parse HEAD', this.repoName, container);
+
+    await destroyContainer(container);
+  }
+  // ...
+}
+\\\\\`\\\\\`\\\\\`
+
+## Justifications
+- **New Module (./modules/commitMessageGenerator)**: Enhances maintainability and reusability by centralizing commit message generation.
+- **Integration with Coder Class**: Uses the new module to improve commit message quality without disrupting existing workflows.
+- **Minimal Changes**: Ensures stability by limiting changes to critical system integrations.
+
+## Future Considerations
+
+- **Refactor/Deprecate \`./commitMessageGenerator.js\`**: Determine the necessity of this file based on its current usage within the repository.
+- **Commit Message Logic Enhancements**: Consider more sophisticated logic for future versions, including automatic context inclusion and integration with external systems.
+
+This specification aims at improving the clarity, maintainability, and effectiveness of commit message generation within the \`agent2\` repository.
+\\\`\\\`\\\`
 \`\`\``;
 
 module.exports = { generateSpec };

@@ -2,6 +2,9 @@ const { queryLlmWithJsonCheck } = require('../../../../llmService');
 const { executeCommand } = require('../../../../dockerOperations');
 
 async function addFile(filePath, spec, repoName) {
+  if (!filePath.startsWith('./')) {
+    filePath = `./${filePath}`;
+  }
   const edit = await queryLlmWithJsonCheck([{role: 'system', content: createAddFileSystemPrompt(spec)}, {role: 'user', content: query(filePath)}], validateAddFile);
   if (edit.code) {
     const dir = filePath.substring(0, filePath.lastIndexOf('/'));

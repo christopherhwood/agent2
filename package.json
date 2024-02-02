@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "lint": "eslint --fix .",
+    "lint": "eslint --fix",
     "test": "jest --run-in-band"
   },
   "repository": {

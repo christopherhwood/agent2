@@ -4,13 +4,12 @@ const { pickCodeContext } = require('../search/output');
 // const { executeCommand } = require('../../dockerOperations');
 
 async function resolveTasks(tasks, originalGoal, problemStatement, repoName) {
-  const coder = new Coder(originalGoal, repoName);
   for (const task of tasks) {
     const selectedContext = await pickCodeContext(task, problemStatement, repoName);
     // TODO: Maybe filter selectedContext w/ LLM or do some form of ranking.
     console.log('selectedContext', selectedContext);
     task.selectedContext = selectedContext; 
-    await resolveCodingTask(task, problemStatement, coder);
+    await resolveCodingTask(task, problemStatement, repoName);
   }
   // const nonCoder = await NonCoder.Create(repoName);
   // const coder = new Coder(originalGoal, repoName);
