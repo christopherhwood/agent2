@@ -22,7 +22,12 @@ class Coder {
     const messages = await queryLlmWTools([{role: 'system', content: SystemPrompt(this.task, this.spec)}, {role: 'user', content: 'Select a tool to get started.'}], this.getTools(), this, true);
 
     if (this.hasChanges()) {
-      const commitMessage = await queryLlm([{role: 'system', content: `You are a tech lead software engineer overseeing the completion of the following task and tech spec:\n**Task:**\n\`\`\`json\n${JSON.stringify(this.task)}\n\`\`\`\n\n**Spec:**\n\`\`\`markdown\n${this.spec}\`\`\``}, ...messages.splice(1), {role: 'tool', tool_call_id: messages[messages.length-1].tool_calls[0].id, name: 'pass', content: 'Please give a commit message for the changes you made. Use markdown to describe the changes in detail.'}]);
+      // get the id of the last message tool call
+      const lastMessage = messages[messages.length - 1];
+      console.log('lastMessage', JSON.stringify(lastMessage));
+      const lastToolCallId = lastMessage.tool_calls[0].id;
+      console.log('lastToolCallId', lastToolCallId);
+      const commitMessage = await queryLlm([{role: 'system', content: `You are a tech lead software engineer overseeing the completion of the following task and tech spec:\n**Task:**\n\`\`\`json\n${JSON.stringify(this.task)}\n\`\`\`\n\n**Spec:**\n\`\`\`markdown\n${this.spec}\`\`\``}, ...messages.splice(1), {role: 'tool', tool_call_id: lastToolCallId, name: 'pass', content: 'Please give a commit message for the changes you made. Use markdown to describe the changes in detail.'}]);
       this.commitChanges(commitMessage);
     }
   }

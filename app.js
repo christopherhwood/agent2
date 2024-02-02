@@ -92,7 +92,7 @@ router.post('/generate-plan', async (ctx) => {
 router.post('/resolve-tasks', async (ctx) => {
   try {
     // task is json object & repoUrl is string
-    const { tasks, repoUrl, originalGoal, problemStatement } = ctx.request.body;
+    const { tasks, repoUrl, problemStatement } = ctx.request.body;
     const repoName = extractRepoName(repoUrl);
     // This is a hack for now:
     await executeCommand('git config user.name "qckfx Agent"', repoName);
@@ -103,7 +103,7 @@ router.post('/resolve-tasks', async (ctx) => {
     // Re-index the repo
     await updateRepoEmbeddings(repoName);
     // Resolve tasks
-    const resolvedTasks = await resolveTasks(tasks, originalGoal, problemStatement, repoName);
+    const resolvedTasks = await resolveTasks(tasks, problemStatement, repoName);
     // Submit PR
     ctx.status = 200;
     ctx.body = { message: 'Tasks resolved successfully', tasks: resolvedTasks };
