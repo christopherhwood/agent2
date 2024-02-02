@@ -1,25 +1,9 @@
-const { queryLlmWithJsonCheck } = require('../../../../llmService');
+const { queryLlm } = require('../../../../llmService');
 
 async function generateSpec(task, problemStatement) {
-  const res = await queryLlmWithJsonCheck([{role: 'system', content: SystemPrompt}, {role: 'user', content: query(task, problemStatement)}], validateSpec);
+  const res = await queryLlm([{role: 'system', content: SystemPrompt}, {role: 'user', content: query(task, problemStatement)}]);
   return res;
 }
-
-const validateSpec = (response) => {
-  if (!response || !response.filesToChange || !response.filesToAdd || !response.filesToDelete) {
-    throw new Error('Response must be an object with filesToChange, filesToAdd, and filesToDelete properties');
-  }
-  if (!Array.isArray(response.filesToChange)) {
-    response.filesToChange = [];
-  }
-  if (!Array.isArray(response.filesToAdd)) {
-    response.filesToAdd = [];
-  }
-  if (!Array.isArray(response.filesToDelete)) {
-    response.filesToDelete = [];
-  }
-  return response;
-};
 
 const query = (task, problemStatement) => {
   let query = `#${task.title}\n`;
