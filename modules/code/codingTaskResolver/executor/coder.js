@@ -1,5 +1,4 @@
 const { Container, executeCommand } = require('../../../../dockerOperations.js');
-const { cleanUpCode } = require('./cleanUpCode');
 
 const { queryLlmWTools, queryLlm } = require('../../../../llmService.js');
 const { addFile } = require('./addFile');
@@ -11,6 +10,7 @@ class Coder {
     this.task = task;
     this.spec = spec;
     this.repoName = repoName;
+    this.approved = false;
   }
 
   async hasChanges() {
@@ -20,15 +20,35 @@ class Coder {
 
   async resolveTask() {
     const messages = await queryLlmWTools([{role: 'system', content: SystemPrompt(this.task, this.spec)}, {role: 'user', content: 'Select a tool to get started.'}], this.getTools(), this, true);
+    return await this.checkChangesAndMaybeApprove(messages);
+  }
 
+  async checkChangesAndMaybeApprove(messages) {
     if (this.hasChanges()) {
+      if (!this.approved) {
+        return await this.getApproval(messages);
+      }
+
       // get the id of the last message tool call
       const lastMessage = messages[messages.length - 1];
-      console.log('lastMessage', JSON.stringify(lastMessage));
       const lastToolCallId = lastMessage.tool_calls[0].id;
-      console.log('lastToolCallId', lastToolCallId);
+
       const commitMessage = await queryLlm([{role: 'system', content: `You are a tech lead software engineer overseeing the completion of the following task and tech spec:\n**Task:**\n\`\`\`json\n${JSON.stringify(this.task)}\n\`\`\`\n\n**Spec:**\n\`\`\`markdown\n${this.spec}\`\`\``}, ...messages.splice(1), {role: 'tool', tool_call_id: lastToolCallId, name: 'pass', content: 'Please give a commit message for the changes you made. You may use markdown to describe the changes, but keep the message concise and useful. Just write straight markdown, no need to wrap it in backticks.'}]);
       this.commitChanges(commitMessage);
+    }
+  }
+
+  async getApproval(oldMessages) {
+    if (!this.approved) {
+      this.approved = true;
+      const diff = await this.gitDiff();
+
+      // get the id of the last message tool call
+      const lastMessage = oldMessages[oldMessages.length - 1];
+      const lastToolCallId = lastMessage.tool_calls[0].id;
+
+      const messages =  await queryLlmWTools([...oldMessages, {role: 'tool', tool_call_id: lastToolCallId, name: 'pass', content: `Before committing these changes, take a very critical look at this diff, like Linus Torvalds level of critical. Be mindful of integration points both internal and external to the system. Be sure they receive minimal changes and only the changes that are required by the task at hand. Pay particular attention to objects and any new properties added to them. Be sure those properties are required by the task and avoid altering object properties without just cause.\nTake action on any changes you deem necessary, or pass to go ahead and commit this change.\n\nGit Diff of changes:\n\`\`\`${diff}\`\`\``}], this.getTools(), this, true);
+      return await this.checkChangesAndMaybeApprove(messages);
     }
   }
 
@@ -45,27 +65,29 @@ class Coder {
   }
   
   async createFile(path, spec) {
+    this.approved = false;
     await addFile(path, spec, this.repoName);
-    await cleanUpCode(path, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
     return `**${path}:**\n\`\`\`\n${contents}\n\`\`\``;
   }
 
   async deleteFile(path) {
+    this.approved = false;
     await executeCommand(`rm ${path}`, this.repoName);
     return `Deleted ${path}`;
   }
 
   async editCode(path, spec) {
+    this.approved = false;
     await editCode(path, spec, this.repoName);
-    await cleanUpCode(path, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
     return `**${path}:**\n\`\`\`\n${contents}\n\`\`\``;
   }
 
   async executeCommand(command) {
+    this.approved = false;
     return await executeCommand(command, this.repoName);
   }
 

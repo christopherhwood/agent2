@@ -3,10 +3,10 @@ const { selectRelatedCode } = require('./searchCode');
 const { rankCode } = require('./rankCode');
 const { extractKeyWords } = require('./extractKeyWords');
 
-async function pickCodeContext(task, problemStatement, repoName, debug=false) {
+async function pickCodeContext(task, problemStatement, repoName, excludedFiles=[], debug=false) {
   const keywords = await extractKeyWords(task);
   const taskEmbedding = await createEmbedding(keywords.join(' '));
-  const selectedSnippets = await selectRelatedCode(repoName, taskEmbedding);
+  const selectedSnippets = await selectRelatedCode(repoName, taskEmbedding, excludedFiles);
   if (debug) {
     console.log('selectedSnippets', selectedSnippets);
   }

@@ -129,10 +129,10 @@ router.post('/debug-only-send-payload', async (ctx) => {
 
 router.post('/debug-only-search-code', async (ctx) => {
   try {
-    const { query, problemStatement, repoUrl } = ctx.request.body;
+    const { query, problemStatement, excludedFiles, repoUrl } = ctx.request.body;
     const repoName = extractRepoName(repoUrl);
     await updateRepoEmbeddings(repoName);
-    const context = await pickCodeContext(query, problemStatement, repoName, true);
+    const context = await pickCodeContext(query, problemStatement, repoName, excludedFiles, true);
     return ctx.response.body = context;
   } catch (err) {
     console.error(err);

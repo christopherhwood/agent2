@@ -1,13 +1,21 @@
 const { queryLlmWithJsonCheck } = require('../../../../llmService');
 const { Container, executeCommand } = require('../../../../dockerOperations');
 const { v4: uuidv4 } = require('uuid');
+const { createEmbedding } = require('../../../search/ingestion/embedder');
+const { selectRelatedCode } = require('../../../search/output/searchCode');
 
 async function editCode(filePath, spec, repoName) {
+  if (!filePath.startsWith('./')) {
+    filePath = `./${filePath}`;
+  }
   await editCodeLoop(filePath, spec, [], repoName);
 }
 
 async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining = 3) {
-  const edits = await sendEditCodeRequest(filePath, spec, messages, repoName);
+  const specEmbedding = await createEmbedding(spec);
+  const relevantSnippets = await selectRelatedCode(repoName, specEmbedding, [filePath]);
+  const res = await sendEditCodeRequest(filePath, spec, relevantSnippets, messages, repoName);
+  const edits = res.edits;
   for (const edit of edits) {
     try {
       await tryToEditCode(filePath, edit, repoName);
@@ -19,7 +27,7 @@ async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining =
   const errorEdits = edits.filter(edit => edit.error);
   if (errorEdits.length > 0) {
     if (triesRemaining > 0) {
-      await editCodeLoop(filePath, spec, [...messages, {role: 'assistant', content: JSON.stringify(edits)}, {role: 'user', content: fixErrorQuery(edits)}], repoName, triesRemaining - 1);
+      await editCodeLoop(filePath, spec, [...messages, {role: 'assistant', content: JSON.stringify(res)}, {role: 'user', content: fixErrorQuery(edits)}], repoName, triesRemaining - 1);
     } else {
       console.log('Unfixed error edits:\n', errorEdits);
     }
@@ -37,10 +45,10 @@ const fixErrorQuery = (edits) => {
   return query;
 };
 
-async function sendEditCodeRequest(filePath, spec, messages, repoName) {
+async function sendEditCodeRequest(filePath, spec, relevantSnippets, messages, repoName) {
   const editQuery = await query(filePath, repoName);
-  const res = await queryLlmWithJsonCheck([{role: 'system', content: createEditCodeSystemPrompt(spec)}, {role: 'user', content: editQuery}, ...messages], validateEditCode);
-  return res.edits;
+  const res = await queryLlmWithJsonCheck([{role: 'system', content: createEditCodeSystemPrompt(spec, relevantSnippets)}, {role: 'user', content: editQuery}, ...messages], validateEditCode);
+  return res;
 }
 
 async function tryToEditCode(filePath, edit, repoName) {
@@ -110,7 +118,7 @@ const query = async (filePath, repoName) => {
   \`\`\``;
 };
 
-const createEditCodeSystemPrompt = (spec) => {return `You are a senior software engineer working on a programming task. You are provided a file path identifying the file that we are editing, and an engineering spec for a task.
+const createEditCodeSystemPrompt = (spec, relevantSnippets) => {return `You are a senior software engineer working on a programming task. You are provided a file path identifying the file that we are editing, and an engineering spec for a task.
 
 Your job is to write the javascript code for the new file. Your output will be structured as follows, detailing the edits you propose:
 \`\`\`json
@@ -147,6 +155,11 @@ Do NOT remove or change code that is seemingly unrelated to the task at hand. It
 The engineering spec is below:
 \`\`\`json
 ${JSON.stringify(spec)}
+\`\`\`
+
+Potentially relevant code snippets:
+\`\`\`json
+${JSON.stringify(relevantSnippets)}
 \`\`\``;};
 
 module.exports = { editCode, tryToEditCode };

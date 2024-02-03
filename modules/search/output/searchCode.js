@@ -4,8 +4,9 @@ const { executeCommand } = require('../../../dockerOperations');
 const { hashText } = require('../../../utils');
 
 // Returns a {filePath: [context]} map of related code snippets
-async function selectRelatedCode(repoName, embedding, limit = 10) {
+async function selectRelatedCode(repoName, embedding, excludedFiles=[], limit = 10) {
   if (!embedding || !repoName) throw new Error('Invalid input', repoName, embedding);
+  let filter = excludedFiles.length > 0 ? { '$and': [{ 'repoName': {'$eq': repoName} }, { 'filePath': {'$nin': excludedFiles}}] } : { 'repoName': {'$eq': repoName} };
   const res = await CodeModel.aggregate([
     {
       $vectorSearch: {
@@ -14,7 +15,7 @@ async function selectRelatedCode(repoName, embedding, limit = 10) {
         queryVector: embedding,
         numCandidates: limit * 10,
         limit: limit,
-        filter: { 'repoName': {'$eq': repoName} }
+        filter: filter
       }
     },
     {
