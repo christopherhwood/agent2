@@ -3,6 +3,7 @@ const { queryLlmWithJsonCheck } = require('../../../../llmService');
 const { Container, executeCommand } = require('../../../../dockerOperations');
 const { createEmbedding } = require('../../../search/ingestion/embedder');
 const { selectRelatedCode } = require('../../../search/output/searchCode');
+const { warnAboutInvalidFunctionCalls } = require('../analyzer/warnings/updateFunctionCalls');
 
 async function editCode(filePath, spec, repoName) {
   if (!filePath.startsWith('./')) {
@@ -75,20 +76,23 @@ async function tryToEditCode(filePath, edit, repoName) {
     // Destroy the container
     const fileContents = await container.executeCommand(`cat ${filePath}`);
     try {
-      if (output && output.length > 0) {
+      if (output && output.trim().length > 0) {
         if (output.includes('Error:')) {
           output = '# Error\n' + output;
           output += `\n\n**Original File Contents at ${filePath}:**\n\`\`\`\n` + fileContents + '\n```'; 
           throw new Error(output);
         }
       } else {
-        output = '# Success\nThe file\'s contents are:';
-        output += `\n\`\`\`\n${fileContents}\n\`\`\``;
+        output = 'File edited successfully.';
+        const functionCallWarning = await warnAboutInvalidFunctionCalls(originalCode, newCode, repoName);
+        if (functionCallWarning) {
+          output += '\n\n**WARNING:**\n' + functionCallWarning;
+        }
       }
     } finally {
       await container.destroy();
     }
-    return 'File edited successfully';
+    return output;
   }
   throw new Error('Error: File not edited - invalid contents');
 }
@@ -138,6 +142,8 @@ Your job is to write the javascript code for the new file. Your output will be s
 The newCode will replace the originalCode, meaning that the originalCode will be completely removed and the newCode will be copied directly as written, including any comments, verbatim. Be careful about what code is deleted. Only make changes as directed in the spec, do not go off script. Do not include anything in the newCode you wouldn't want to appear in the committed code.
 
 Only write code you are confident about. Be especially careful about assuming the properties of objects unless you know the properties for sure. In the case of adding validations, it's better to add less and be correct than to add more and be incorrect.
+
+When writing imports, follow the existing import syntax (es6, commonjs, etc). When doing dynamic imports in commonjs, try to always add them at the top level of the file unless you have a very good reason for doing otherwise. Try to avoid dynamic imports in es6 unless you have a very good reason for doing otherwise. Following this instruction will make it easier to understand the dependencies of the file and make it easier to statically analyze the code.
 
 Be wary when editing functions that are currently in use. If you change the function signature, you will need to update all calls to that function. If you change the function body, you will need to ensure that the new code does not break any existing functionality. It may be easier sometimes to create a new function that accomplishes your goals rather than trying to edit an existing function. However, bare in mind that this will increase the amount of code in the codebase and the maintenance burden.
 
