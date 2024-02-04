@@ -1,8 +1,8 @@
 require('dotenv').config();  // Ensure environment variables are loaded
+const fs = require('fs');
 const Koa = require('koa');
 const Router = require('@koa/router');
 const { OpenAI } = require('openai');
-const fs = require('fs');
 const { koaBody } = require('koa-body');
 const { cloneRepositoryInContainer, executeCommand } = require('./dockerOperations');
 const { ensureGitSuffix, extractRepoName } = require('./utils');
@@ -122,6 +122,7 @@ router.post('/debug-only-send-payload', async (ctx) => {
     const res = await openai.chat.completions.create(jsonPayload);
     console.log(JSON.stringify(res));
     ctx.response = res;
+    ctx.status = 200;
   } catch (err) {
     console.error(err);
   }

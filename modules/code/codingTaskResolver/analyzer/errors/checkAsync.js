@@ -1,5 +1,5 @@
 const { createParser, createQuery } = require('../../../../../codeParser');
-const { extractFunctions } = require('../../../../summary/analysis/functionAnalysis.js');
+const { extractFunctions } = require('../../../../summary/analysis/functionAnalysis');
 
 function findIncorrectAsyncUsage(code) {
   const functions = extractFunctions(code);

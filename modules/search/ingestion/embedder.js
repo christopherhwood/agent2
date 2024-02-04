@@ -1,4 +1,5 @@
 const openai = require('openai');
+
 const OpenAI = new openai(process.env.OPENAI_API_KEY);
 
 async function createEmbedding(text) {

@@ -1,6 +1,6 @@
+const { v4: uuidv4 } = require('uuid');
 const { queryLlmWithJsonCheck } = require('../../../../llmService');
 const { Container, executeCommand } = require('../../../../dockerOperations');
-const { v4: uuidv4 } = require('uuid');
 const { createEmbedding } = require('../../../search/ingestion/embedder');
 const { selectRelatedCode } = require('../../../search/output/searchCode');
 
@@ -126,6 +126,7 @@ Your job is to write the javascript code for the new file. Your output will be s
   "edits": [
     {
       "id": "a unique id",
+      "thoughts": "Your thoughts on the edit",
       "originalCode": "Exact subsection of the original code to be replaced, including comments and spacing. This must match _exactly_ the code in the file. If it does not, the command will fail. If the code contains comments, the comments must match _exactly_ what is in the source file. Otherwise, the command will fail. The original code will be removed in its entirety and replaced with the contents of newCode. Ensure you are only deleting the code that needs to be replaced. If you delete too much, you will break the codebase. If you delete too little, you will not fix the issue. Be careful.",
       "newCode": "The revised code snippet that corrects the identified issue. This will replace the originalCode exactly as written, including any comments, verbatim."
     },

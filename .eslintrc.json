@@ -9,6 +9,7 @@
     "parserOptions": {
         "ecmaVersion": "latest"
     },
+    "plugins": ["import"],
     "rules": {
         "indent": [
             "error",
@@ -25,6 +26,22 @@
         "semi": [
             "error",
             "always"
-        ]
+        ],
+        "import/no-unresolved": "error",
+        "import/no-commonjs": "off",
+        "import/no-amd": "error",
+        "import/first": "error",
+        "import/no-duplicates": "error",
+        "import/no-namespace": "error",
+        "import/extensions": ["error", "always", { "js": "never", "json": "never" }],
+        "import/order": ["error", { "groups": ["builtin", "external", "parent", "sibling", "index"] }],
+        "import/newline-after-import": "error" 
+    },
+    "settings": {
+        "import/resolver": {
+            "node": {
+                "extensions": [".js", ".json"]
+            }
+        }
     }
 }

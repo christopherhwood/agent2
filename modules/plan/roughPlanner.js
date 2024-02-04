@@ -1,4 +1,4 @@
-const { queryLlm } = require('../../llmService.js');
+const { queryLlm } = require('../../llmService');
 
 async function generateRoughPlan(taskDescription, summary, answers) {
 

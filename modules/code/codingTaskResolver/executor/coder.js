@@ -1,6 +1,6 @@
-const { Container, executeCommand } = require('../../../../dockerOperations.js');
+const { Container, executeCommand } = require('../../../../dockerOperations');
 
-const { queryLlmWTools, queryLlm } = require('../../../../llmService.js');
+const { queryLlmWTools, queryLlm } = require('../../../../llmService');
 const { addFile } = require('./addFile');
 const { editCode } = require('./editCode');
 
@@ -20,6 +20,8 @@ class Coder {
 
   async resolveTask() {
     const messages = await queryLlmWTools([{role: 'system', content: SystemPrompt(this.task, this.spec)}, {role: 'user', content: 'Select a tool to get started.'}], this.getTools(), this, true);
+    
+    this.approved = true;
     return await this.checkChangesAndMaybeApprove(messages);
   }
 
@@ -69,7 +71,8 @@ class Coder {
     await addFile(path, spec, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
-    return `**${path}:**\n\`\`\`\n${contents}\n\`\`\``;
+    const lint = await executeCommand('npm run lint -- .', this.repoName);
+    return `**${path}:**\n\`\`\`\n${contents}\n\`\`\`\n**Linting Output:**\n\`\`\`\n${lint}\n\`\`\``;
   }
 
   async deleteFile(path) {
@@ -83,7 +86,8 @@ class Coder {
     await editCode(path, spec, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
-    return `**${path}:**\n\`\`\`\n${contents}\n\`\`\``;
+    const lint = await executeCommand('npm run lint -- .', this.repoName);
+    return `**${path}:**\n\`\`\`\n${contents}\n\`\`\`\n**Linting Output:**\n\`\`\`\n${lint}\n\`\`\``;
   }
 
   async executeCommand(command) {

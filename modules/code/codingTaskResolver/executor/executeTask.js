@@ -1,6 +1,6 @@
+const { executeCommand } = require('../../../../dockerOperations');
 const Coder = require('./coder');
 const { generateSpec } = require('./specCreator');
-const { executeCommand } = require('../../../../dockerOperations');
 
 async function executeTask(task, problemStatement, repoName) {
   const spec = await generateSpec(task, problemStatement);

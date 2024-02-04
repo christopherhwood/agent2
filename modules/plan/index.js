@@ -1,7 +1,7 @@
-const { genTaskDeepDive } = require('./taskDeepDiver.js');
-const ProblemTracer = require('./problemTracer.js');
-const { genPRD } = require('./productBrainstormer.js');
-const { genImplementationPlan } = require('./implementationPlanner.js');
+const { genTaskDeepDive } = require('./taskDeepDiver');
+const ProblemTracer = require('./problemTracer');
+const { genPRD } = require('./productBrainstormer');
+const { genImplementationPlan } = require('./implementationPlanner');
 
 async function generatePlan(taskDescription, repoName, repoContext, summary) {
   const taskDeepDive = await genTaskDeepDive(taskDescription, summary);

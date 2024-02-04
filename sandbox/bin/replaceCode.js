@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const pathModule = require('path');
-const diff = require('diff');
 
 // Parse command-line arguments
 const args = process.argv.slice(2);

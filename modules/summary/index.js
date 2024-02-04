@@ -1,6 +1,6 @@
+const { queryLlm } = require('../../llmService');
 const { getRepoContext } = require('./codePicker');
 const { analyzeRepo } = require('./analyzeRepo');
-const { queryLlm } = require('../../llmService');
 
 async function generateSummary(repoName) {
   // Analyze repo and generate summary.

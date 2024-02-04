@@ -1,6 +1,6 @@
+const { Container } = require('../../../dockerOperations');
 const { extractDependencies } = require('./dependencyAnalysis');
 const { extractFunctions } = require('./functionAnalysis');
-const { Container } = require('../../../dockerOperations');
 
 class Analyzer {
 

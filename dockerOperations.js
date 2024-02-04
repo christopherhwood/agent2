@@ -1,7 +1,8 @@
-const Docker = require('dockerode');
 const fs = require('fs');
 const os = require('os');
+const Docker = require('dockerode');
 const { extractRepoName } = require('./utils');
+
 const docker = new Docker();
 
 const hostRepoPath = '/var/qckfx/repos';

@@ -1,5 +1,5 @@
-const { executeTask } = require('./executor/executeTask');
 const { updateRepoEmbeddings } = require('../../search/ingestion/traverseRepo');
+const { executeTask } = require('./executor/executeTask');
 
 async function resolveCodingTask(task, problemStatement, repoName) {
   await executeTask(task, problemStatement, repoName);

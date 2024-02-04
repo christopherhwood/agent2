@@ -1,9 +1,9 @@
 const FileModel = require('../../db/fileModel');
 const CodeModel = require('../../db/codeModel');
 const Traverser = require('../../summary/parser/traverser');
+const { hashText } = require('../../../utils');
 const CodeChunker = require('./codeChunker');
 const { createEmbedding } = require('./embedder');
-const { hashText } = require('../../../utils');
 
 async function updateRepoEmbeddings(repoName) {
   const traverser = await Traverser.Create(repoName);

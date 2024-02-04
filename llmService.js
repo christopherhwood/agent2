@@ -1,8 +1,8 @@
-const { OpenAI } = require('openai');
-const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+const { OpenAI } = require('openai');
 
 const openai = new OpenAI(process.env.OPENAI_API_KEY);
 

@@ -1,6 +1,6 @@
+const { Container } = require('../../../dockerOperations');
 const DirectoryExplorer = require('./directoryExplorer');
 const GitIgnore = require('./gitIgnore');
-const { Container } = require('../../../dockerOperations');
 
 class Traverser {
   static async Create(repoName) {
