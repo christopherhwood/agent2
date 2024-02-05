@@ -33,11 +33,11 @@ function detectFunctionSignatures(code) {
       console.log('Error: no name for function declaration. \n', node.text);
       continue;
     }
-    const returnTypeNode = node.descendantsOfType('return_statement').map(r => r.text);
+    const returnTypeAnalysis = analyzeReturnTypes(node);
     functionSignatures.push({
       name: nameNode.text,
       params: node.descendantsOfType('identifier').filter(i => i.parent.type === 'formal_parameters').map(p => p.text),
-      returnType: returnTypeNode.length > 0 ? returnTypeNode[0] : 'void'
+      returnType: returnTypeAnalysis
     });
   }
   for (const node of tree.rootNode.descendantsOfType('arrow_function')) {
@@ -54,6 +54,28 @@ function detectFunctionSignatures(code) {
     });
   }
   return functionSignatures;
+}
+
+function analyzeReturnTypes(node) {
+  const returnStatements = node.descendantsOfType('return_statement');
+  if (returnStatements.length === 0) return 'void';
+
+  // Simplified analysis for demonstration purposes
+  const returnTypes = returnStatements.map(r => {
+    const returnValue = r.descendantsOfType('literal').map(l => l.text);
+    if (returnValue.length > 0) {
+      return typeof returnValue[0]; // Primitive type based on the literal
+    }
+    // Check for object or array returns
+    if (r.text.includes('{') || r.text.includes('[')) {
+      return 'object';
+    }
+    // Default to 'unknown' if unable to determine
+    return 'unknown';
+  });
+
+  // For simplicity, return the first identified type
+  return returnTypes[0];
 }
 
 module.exports = { detectChangedFunctionSignatures };
