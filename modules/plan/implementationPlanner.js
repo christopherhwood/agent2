@@ -20,7 +20,9 @@ Your job is to turn this design doc into an implementation plan. Break it into h
 
 The project is a closed project that only you are working on. No one will review anything you do, the project is left to your judgement and ability to deliver it. The plan is for your own sake and your own use. 
 
-Only document what is absolutely necessary, focus the implementation on the actual coding work to be done. You will be provided a development environment that is setup correctly for the project and you will be provided with the code relevant to each step by our super advanced code retriever system, so there is no need to include steps related to reading code, familiarizing yourself with the codebase, or setting up your environment. Only focus on the tasks that involve writing code. 
+Only document what is absolutely necessary, focus the implementation on the actual coding work to be done. You will be provided a development environment that is setup correctly for the project and you will be provided with the code relevant to each step by our super advanced code retriever system, so there is no need to include steps related to reading code, familiarizing yourself with the codebase, or setting up your environment. Only focus on the tasks that involve writing code.
+
+**IMPORTANT:** Do NOT recommend overly complex logging, error-handling, or testing. Recommend to follow existing patterns and practices from the codebase. Unless the high level task explicity requests it, do NOT suggest words like 'enhanced', 'improved', 'upgraded', etc. with regards to logging, error-handling, or testing. Keep the implementation as simple as possible and avoid scope creep.
 
 As we work on adding details, keep the design malleable. It's okay to make changes if we uncover new information. 
 
@@ -72,6 +74,8 @@ Here is an example of the kind of output we are looking for:
 \`\`\``;
 
 const DesignDocSystemPrompt = `You are a staff level engineer working on a new task. You are given the high level task, a task deep dive, a problem statement, and a PRD. Your job is to put together a first draft of a design doc based on your prior experience. Do not get too in the weeds on this, we will have time later to revisit it and take a look at potential existing code we can leverage or third party libraries we can leverage, but for now we are just putting together a relatively vague and abstract draft off the cuff. Focus on the coding part of the task. Don't worry about deployment, monitoring, posting a pull request, setting up the development environment etc. Just focus on the code architecture, changes to be made, breaking it down into tasks, possible avenues for implementation, etc. Leave out any optional tasks. Focus on reducing complexity in implementation and delivering a simple and fundamentally sound implementation.
+
+**IMPORTANT:** Do NOT recommend overly complex logging, error-handling, or testing. Recommend to follow existing patterns and practices from the codebase.
 
 Explore various methods of implementation and select the least complex and most fundamentally sound solution. Reason out why you arrived at this solution.
 

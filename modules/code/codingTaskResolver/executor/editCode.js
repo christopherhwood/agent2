@@ -9,7 +9,7 @@ async function editCode(filePath, spec, repoName) {
   if (!filePath.startsWith('./')) {
     filePath = `./${filePath}`;
   }
-  await editCodeLoop(filePath, spec, [], repoName);
+  return await editCodeLoop(filePath, spec, [], repoName);
 }
 
 async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining = 3) {
@@ -17,9 +17,13 @@ async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining =
   const relevantSnippets = await selectRelatedCode(repoName, specEmbedding, [filePath]);
   const res = await sendEditCodeRequest(filePath, spec, relevantSnippets, messages, repoName);
   const edits = res.edits;
+  let outputs = [];
   for (const edit of edits) {
     try {
-      await tryToEditCode(filePath, edit, repoName);
+      const editRes = await tryToEditCode(filePath, edit, repoName);
+      if (editRes.trim().length > 0) {
+        outputs.push(editRes);
+      }
     } catch (err) {
       edit.error = err.message;
     }
@@ -28,11 +32,16 @@ async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining =
   const errorEdits = edits.filter(edit => edit.error);
   if (errorEdits.length > 0) {
     if (triesRemaining > 0) {
-      await editCodeLoop(filePath, spec, [...messages, {role: 'assistant', content: JSON.stringify(res)}, {role: 'user', content: fixErrorQuery(edits)}], repoName, triesRemaining - 1);
+      const editRes = await editCodeLoop(filePath, spec, [...messages, {role: 'assistant', content: JSON.stringify(res)}, {role: 'user', content: fixErrorQuery(edits)}], repoName, triesRemaining - 1);
+      if (editRes.trim().length > 0) {
+        outputs.push(editRes);
+      }
     } else {
       console.log('Unfixed error edits:\n', errorEdits);
+      return 'Editing was unsuccessful due to errors:\n\n```json\n' + JSON.stringify(errorEdits) + '\n```';
     }
   }
+  return outputs.join('\n');
 }
 
 const fixErrorQuery = (edits) => {
@@ -83,8 +92,9 @@ async function tryToEditCode(filePath, edit, repoName) {
           throw new Error(output);
         }
       } else {
-        output = 'File edited successfully.';
+        output = '';
         const functionCallWarning = await warnAboutInvalidFunctionCalls(originalCode, newCode, repoName);
+        console.log('functionCallWarning:', functionCallWarning);
         if (functionCallWarning) {
           output += '\n\n**WARNING:**\n' + functionCallWarning;
         }
@@ -141,9 +151,11 @@ Your job is to write the javascript code for the new file. Your output will be s
 
 The newCode will replace the originalCode, meaning that the originalCode will be completely removed and the newCode will be copied directly as written, including any comments, verbatim. Be careful about what code is deleted. Only make changes as directed in the spec, do not go off script. Do not include anything in the newCode you wouldn't want to appear in the committed code.
 
-Only write code you are confident about. Be especially careful about assuming the properties of objects unless you know the properties for sure. In the case of adding validations, it's better to add less and be correct than to add more and be incorrect.
+Only write code you are confident about. **VERY IMPORTANT:** Do NOT assume the existence of modules, files, or properties on objects (not even the id property)! Our number one priority is to write code that will run and not crash. In the case of adding validations, it's better to add less and be correct than to add more and be incorrect.
 
 When writing imports, follow the existing import syntax (es6, commonjs, etc). When doing dynamic imports in commonjs, try to always add them at the top level of the file unless you have a very good reason for doing otherwise. Try to avoid dynamic imports in es6 unless you have a very good reason for doing otherwise. Following this instruction will make it easier to understand the dependencies of the file and make it easier to statically analyze the code.
+
+Don't remove comments unless they are rendered unnecessary by the code changes. If you are removing code that has comments, make sure to remove the comments as well. Be particularly careful about comments tagged TODO, FIXME, etc.
 
 Be wary when editing functions that are currently in use. If you change the function signature, you will need to update all calls to that function. If you change the function body, you will need to ensure that the new code does not break any existing functionality. It may be easier sometimes to create a new function that accomplishes your goals rather than trying to edit an existing function. However, bare in mind that this will increase the amount of code in the codebase and the maintenance burden.
 

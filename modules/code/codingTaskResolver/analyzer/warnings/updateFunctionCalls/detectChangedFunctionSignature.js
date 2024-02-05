@@ -6,13 +6,16 @@ function detectChangedFunctionSignatures(originalCode, newCode) {
   const functionsWithChangedParams = [];
   const deletedFunctions = [];
 
+  console.log('originalFunctionSignatures:', JSON.stringify(originalFunctionSignatures));
+  console.log('newFunctionSignatures:', JSON.stringify(newFunctionSignatures));
+
   // We want to find the following:
   // Functions w/ same name but different params
   // Deleted functions
   for (const originalFunction of originalFunctionSignatures) {
     const newFunction = newFunctionSignatures.find(f => f.name === originalFunction.name);
     if (!newFunction) {
-      deletedFunctions.push(originalFunction.name);
+      deletedFunctions.push({name: originalFunction.name, oldParams: originalFunction.params});
     } else if (originalFunction.params.join(',') !== newFunction.params.join(',')) {
       functionsWithChangedParams.push({name: originalFunction.name, oldParams: originalFunction.params, newParams: newFunction.params});
     }
@@ -25,15 +28,25 @@ function detectFunctionSignatures(code) {
   const tree = parser.parse(code);
   const functionSignatures = [];
   for (const node of tree.rootNode.descendantsOfType('function_declaration')) {
+    const nameNode = node.descendantsOfType('identifier').find(i => i.parent === node);
+    if (!nameNode) {
+      console.log('Error: no name for function declaration. \n', node.text);
+      continue;
+    }
     functionSignatures.push({
-      name: node.firstChild.text,
-      params: node.descendantsOfType('parameter').map(p => p.firstChild.text)
+      name: nameNode.text,
+      params: node.descendantsOfType('identifier').filter(i => i.parent.type === 'formal_parameters').map(p => p.text)
     });
   }
   for (const node of tree.rootNode.descendantsOfType('arrow_function')) {
+    const nameNode = node.parent.descendantsOfType('identifier').find(i => i.parent === node.parent);
+    if (!nameNode) {
+      console.log('No name for arrow function. \n', node.text);
+      continue;
+    }
     functionSignatures.push({
-      name: node.parent.firstChild.text,
-      params: node.descendantsOfType('parameter').map(p => p.firstChild.text)
+      name: nameNode.text,
+      params: node.descendantsOfType('identifier').filter(i => i.parent.type === 'formal_parameters').map(p => p.text)
     });
   }
   return functionSignatures;

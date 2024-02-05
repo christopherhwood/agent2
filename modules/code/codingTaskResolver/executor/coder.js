@@ -72,7 +72,7 @@ class Coder {
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
     const lint = await executeCommand('npm run lint -- .', this.repoName);
-    return `**${path}:**\n\`\`\`\n${contents}\n\`\`\`\n**Linting Output:**\n\`\`\`\n${lint}\n\`\`\``;
+    return `**Contents of ${path}:**\n\`\`\`\n${contents}\n\`\`\`\n**Linting Output:**\n\`\`\`\n${lint}\n\`\`\``;
   }
 
   async deleteFile(path) {
@@ -83,11 +83,11 @@ class Coder {
 
   async editCode(path, spec) {
     this.approved = false;
-    await editCode(path, spec, this.repoName);
+    const message = await editCode(path, spec, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
     const lint = await executeCommand('npm run lint -- .', this.repoName);
-    return `**${path}:**\n\`\`\`\n${contents}\n\`\`\`\n**Linting Output:**\n\`\`\`\n${lint}\n\`\`\``;
+    return `${message}\n\n**Linting Output:**\n\`\`\`\n${lint}\n\`\`\`\n**Contents of ${path} after editing:**\n\`\`\`\n${contents}\n\`\`\``;
   }
 
   async executeCommand(command) {
@@ -222,6 +222,10 @@ To accomplish this task, you have the following tools at your disposal:
 - \`pass()\`: Mark the task as complete and ready for review, committing all changes to the repository.
 
 As you analyze the spec and task, your responsibility is to create highly detailed specs for code changes that need to be carried out by your team. These specs should provide clear, high-level guidance without delving into the specifics of implementation. This approach ensures that your team has the necessary direction to make the intended changes while retaining the flexibility to adapt to the existing codebase.
+
+** VERY IMPORTANT:** Do NOT make assumptions when writing specs. Do NOT assume the existence of modules, frameworks, files, or properties on objects (not even id)! You have access to the command line and should be able to verify any assumptions or questions you have (for example, use grep, cat, etc). It's important that you not be lazy issuing instructions and to not make mistakes including relying on assumptions or guesses.
+
+Do NOT include complex logging or error handling in your specs. Follow the existing logging and error handling patterns in the code, unless the task explicitly says to do otherwise. Limit the complexity of logging and error handling and do NOT introduce new frameworks for this unless explicitly asked to do so. Remember to focus on the task at hand and avoid scope creep.
 
 Your leadership involves not only directing the technical aspects of the task but also managing the commit history to ensure it remains clean and focused solely on the task at hand. This means avoiding the temptation to include unrelated cleanup work or minor changes that are not directly relevant to the project goal.
 
