@@ -46,11 +46,11 @@ function detectFunctionSignatures(code) {
       console.log('No name for arrow function. \n', node.text);
       continue;
     }
-    const returnTypeNode = node.descendantsOfType('return_statement').map(r => r.text);
+    const returnTypeAnalysis = analyzeReturnTypes(node);
     functionSignatures.push({
       name: nameNode.text,
       params: node.descendantsOfType('identifier').filter(i => i.parent.type === 'formal_parameters').map(p => p.text),
-      returnType: returnTypeNode.length > 0 ? returnTypeNode[0] : 'void'
+      returnType: returnTypeAnalysis
     });
   }
   return functionSignatures;

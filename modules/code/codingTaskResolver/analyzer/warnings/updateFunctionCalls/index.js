@@ -7,7 +7,6 @@ async function warnAboutInvalidFunctionCalls(oldCode, newCode, repoName) {
   const functionsWithChangedReturnTypes = detectChangedReturnTypes(oldCode, newCode);
   console.log('changedFunctions:', JSON.stringify(changedFunctions));
   console.log('functionsWithChangedReturnTypes:', JSON.stringify(functionsWithChangedReturnTypes));
-  changedFunctions.functionsWithChangedReturnTypes = functionsWithChangedReturnTypes;
   if (changedFunctions.functionsWithChangedParams.length > 0 || changedFunctions.deletedFunctions.length > 0 || changedFunctions.functionsWithChangedReturnTypes.length > 0) {
     await tagFunctionCallSites(changedFunctions, repoName);
     let warning = 'The following function calls may be invalid due to changes in the function signature:\n';
@@ -17,8 +16,8 @@ async function warnAboutInvalidFunctionCalls(oldCode, newCode, repoName) {
     for (const func of changedFunctions.deletedFunctions) {
       warning += `Function ${func.name} has been deleted or renamed. Call sites:\n${func.callSites.join('\n')}\n`;
     }
-    for (const func of changedFunctions.functionsWithChangedReturnTypes) {
-      warning += `Function ${func.name} has changed its return type from ${func.oldReturnType} to ${func.newReturnType}. Call sites:\n${func.callSites.join('\n')}\nThis may affect existing logic that relies on the previous return type. Please review and update the call sites as necessary.\n`;
+    for (const func of functionsWithChangedReturnTypes) {
+      warning += `Function ${func.functionName} has changed its return type from ${func.oldReturnType} to ${func.newReturnType}. This may affect existing logic that relies on the previous return type. Please review and update the call sites as necessary.\n`;
     }
     return warning;
   }
