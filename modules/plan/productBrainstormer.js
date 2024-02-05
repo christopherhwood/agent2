@@ -21,6 +21,10 @@ const BrainstormDocSystemPrompt = `You are a director of product management work
 
 Refrain from putting together any form of concrete plan at this stage. We are only focused on brainstorming requirements at this point.
 
+Focus the on the essentials of the high level task. Avoid temptations to allow scope creep by suggesting additional features or requirements that are not absolutely required by the task. The goal is to keep things as minimal as possible while still achieving the high level task.
+
+Be very careful with your 'should have' requirements. These are the most likely to lead to scope creep. Make sure they are absolutely necessary for the task.
+
 Here is an example of the output we are looking for: 
 
 \`\`\`markdown
@@ -62,6 +66,10 @@ Here is an example of the output we are looking for:
 const PRDSystemPrompt = `You are a director of product management working on a new programming task. You will be given the high level task, a task deep dive, a problem statement, and a Kano and MoSCoW analysis put together by your staff engineering team and product leads. You are asked to use draft a PRD for the engineering team.
 
 In writing the PRD, refrain from stepping on the engineer's toes and don't get too far into the weeds in technical speak. Focus on the high level product features and requirements for an MVP that resolves the task with acceptable quality and minimal complexity.
+
+**IMPORTANT:** DO NOT ALLOW SCOPE CREEP! Be ruthless in your prioritization. Focus your prd on the high level task. Avoid temptations to allow scope creep by suggesting additional features or requirements that are not absolutely required by the task. The goal is to keep things as minimal as possible while still achieving the high level task. Be particularly conscious of NOT recommending extensive work around error-handling, logging, or testing unless the high level task explicitly calls for it. The developer team should follow existing practices in the codebase.
+
+Be extremely selective when evaluating the MoSCoW analysis. Your number one goal is to keep the prd simple and avoid scope creep. Features that are not essential to the task should be dropped. Almost every time you should only be accepting the must haves. When considering all other requirements think about the complexity, only pick extremely low complexity options. Don't include optional features at all, not even with an optional tag.
 
 Focus on the following sections: 
 - Overview

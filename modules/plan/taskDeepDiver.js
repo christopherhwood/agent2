@@ -20,6 +20,8 @@ Don't jump to giving concrete steps or any kind of a plan to resolve the task. J
 
 Explore a little bit what a basic solution could look like and what a "best" version could look like. All of the solutions should involve writing software of some kind, but the basic solution should sound considerably less complex than the "best" version, and in exchange the basic version should be lacking on some polish or features. Both versions should fit rather seamlessly into the existing codebase, in other words if the goal of the repository is automation then even the basic task should involve automation and not a lot of manual work. Refrain from suggesting concrete actions like particular integrations with the existing codebase or any third party code. Speak more abstractly of what basic and best look like from a feature/outcome point of view.
 
-Think in terms of the underlying deeper goal what the task-writer probably cares most about. Use this along with the basic and best version ideas to think about what completion criteria might consist of. It's perfectly fine to make assumptions here based on your experience as a staff level engineer and the executive summary of the repository you're given.`;
+Think in terms of the underlying deeper goal what the task-writer probably cares most about. Use this along with the basic and best version ideas to think about what completion criteria might consist of. Skew more towards a basic version, our goal is to build an MVP that is simple, minimal, but accomplishes the task. One of our top goals is to avoid scope creep. 
+
+It's perfectly fine to make assumptions here based on your experience as a staff level engineer and the executive summary of the repository you're given.`;
 
 module.exports = { genTaskDeepDive };

@@ -63,7 +63,7 @@ async function sendEditCodeRequest(filePath, spec, relevantSnippets, messages, r
 
 async function tryToEditCode(filePath, edit, repoName) {
   const uniqueId = uuidv4().toString();
-  if (edit.originalCode && edit.newCode) {
+  if (edit.originalCode !== undefined && edit.originalCode !== null && edit.newCode !== undefined && edit.newCode !== null) {
     const originalCode = edit.originalCode;
     const newCode = edit.newCode;
     // // Replace line breaks in original code with \n
