@@ -33,9 +33,11 @@ function detectFunctionSignatures(code) {
       console.log('Error: no name for function declaration. \n', node.text);
       continue;
     }
+    const returnTypeNode = node.descendantsOfType('return_statement').map(r => r.text);
     functionSignatures.push({
       name: nameNode.text,
-      params: node.descendantsOfType('identifier').filter(i => i.parent.type === 'formal_parameters').map(p => p.text)
+      params: node.descendantsOfType('identifier').filter(i => i.parent.type === 'formal_parameters').map(p => p.text),
+      returnType: returnTypeNode.length > 0 ? returnTypeNode[0] : 'void'
     });
   }
   for (const node of tree.rootNode.descendantsOfType('arrow_function')) {
@@ -44,9 +46,11 @@ function detectFunctionSignatures(code) {
       console.log('No name for arrow function. \n', node.text);
       continue;
     }
+    const returnTypeNode = node.descendantsOfType('return_statement').map(r => r.text);
     functionSignatures.push({
       name: nameNode.text,
-      params: node.descendantsOfType('identifier').filter(i => i.parent.type === 'formal_parameters').map(p => p.text)
+      params: node.descendantsOfType('identifier').filter(i => i.parent.type === 'formal_parameters').map(p => p.text),
+      returnType: returnTypeNode.length > 0 ? returnTypeNode[0] : 'void'
     });
   }
   return functionSignatures;
