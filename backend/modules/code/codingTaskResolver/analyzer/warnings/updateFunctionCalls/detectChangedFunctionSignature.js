@@ -4,6 +4,7 @@ function detectChangedFunctionSignatures(originalCode, newCode) {
   const originalFunctionSignatures = detectFunctionSignatures(originalCode);
   const newFunctionSignatures = detectFunctionSignatures(newCode);
   const functionsWithChangedParams = [];
+  const functionsWithChangedReturnTypes = [];
   const deletedFunctions = [];
 
   console.log('originalFunctionSignatures:', JSON.stringify(originalFunctionSignatures));
@@ -18,9 +19,19 @@ function detectChangedFunctionSignatures(originalCode, newCode) {
       deletedFunctions.push({name: originalFunction.name, oldParams: originalFunction.params});
     } else if (originalFunction.params.join(',') !== newFunction.params.join(',')) {
       functionsWithChangedParams.push({name: originalFunction.name, oldParams: originalFunction.params, newParams: newFunction.params});
+    } else if (!areSetsEqual(new Set(originalFunction.returnTypes), new Set(newFunction.returnTypes))) {
+      functionsWithChangedReturnTypes.push({functionName: originalFunction.name, oldReturnTypes: originalFunction.returnTypes, newReturnTypes: newFunction.returnTypes});
     }
   }
-  return { functionsWithChangedParams, deletedFunctions };
+  return { functionsWithChangedParams, functionsWithChangedReturnTypes, deletedFunctions };
+}
+
+function areSetsEqual(setA, setB) {
+  if (setA.size !== setB.size) return false;
+  for (let a of setA) {
+    if (!setB.has(a)) return false;
+  }
+  return true;
 }
 
 function detectFunctionSignatures(code) {

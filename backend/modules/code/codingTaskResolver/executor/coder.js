@@ -19,7 +19,7 @@ class Coder {
   }
 
   async resolveTask() {
-    const packageJson = await executeCommand('cat package.json', this.repoName);
+    const packageJson = await executeCommand('cat backend/package.json', this.repoName);
     const messages = await queryLlmWTools([{role: 'system', content: SystemPrompt(this.task, this.spec, packageJson)}, {role: 'user', content: 'Select a tool to get started.'}], this.getTools(), this, true);
     
     this.approved = true;
