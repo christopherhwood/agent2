@@ -37,7 +37,7 @@ function detectFunctionSignatures(code) {
     functionSignatures.push({
       name: nameNode.text,
       params: node.descendantsOfType('identifier').filter(i => i.parent.type === 'formal_parameters').map(p => p.text),
-      returnType: returnTypeAnalysis
+      returnTypes: returnTypeAnalysis
     });
   }
   for (const node of tree.rootNode.descendantsOfType('arrow_function')) {
@@ -50,7 +50,7 @@ function detectFunctionSignatures(code) {
     functionSignatures.push({
       name: nameNode.text,
       params: node.descendantsOfType('identifier').filter(i => i.parent.type === 'formal_parameters').map(p => p.text),
-      returnType: returnTypeAnalysis
+      returnTypes: returnTypeAnalysis
     });
   }
   return functionSignatures;
@@ -74,8 +74,7 @@ function analyzeReturnTypes(node) {
     return 'unknown';
   });
 
-  // For simplicity, return the first identified type
-  return returnTypes[0];
+  return Array.from(new Set(returnTypes));
 }
 
 module.exports = { detectChangedFunctionSignatures };
