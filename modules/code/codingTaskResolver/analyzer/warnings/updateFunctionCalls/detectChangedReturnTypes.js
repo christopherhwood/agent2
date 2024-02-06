@@ -9,12 +9,12 @@ function detectChangedReturnTypes(originalFunctionSignatures, newFunctionSignatu
   // Iterate over the original function signatures to detect changes
   originalFunctionSignatures.forEach(originalSig => {
     const newSig = newSignaturesMap.get(originalSig.name);
-    if (newSig && !areReturnTypesEqual(originalSig.returnType, newSig.returnType)) {
+    if (newSig && !areReturnTypesEqual(originalSig.returnTypes, newSig.returnTypes)) {
       // If there's a change in return type, add to the result array
       changedReturnTypes.push({
         functionName: originalSig.name,
-        oldReturnType: originalSig.returnType,
-        newReturnType: newSig.returnType
+        oldReturnTypes: originalSig.returnTypes,
+        newReturnTypes: newSig.returnTypes
       });
     }
   });
@@ -23,11 +23,8 @@ function detectChangedReturnTypes(originalFunctionSignatures, newFunctionSignatu
 }
 
 // Helper function to compare return types
-function areReturnTypesEqual(oldType, newType) {
-  // Implement comparison logic here. This could include checking for primitive type changes,
-  // nullability, and object property deletions.
-  // This is a placeholder implementation. Actual implementation will depend on the project's specific needs.
-  return JSON.stringify(oldType) === JSON.stringify(newType);
+function areReturnTypesEqual(oldTypes, newTypes) {
+  return JSON.stringify(oldTypes) === JSON.stringify(newTypes);
 }
 
 module.exports = detectChangedReturnTypes;
