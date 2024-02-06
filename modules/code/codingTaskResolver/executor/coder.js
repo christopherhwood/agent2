@@ -19,7 +19,8 @@ class Coder {
   }
 
   async resolveTask() {
-    const messages = await queryLlmWTools([{role: 'system', content: SystemPrompt(this.task, this.spec)}, {role: 'user', content: 'Select a tool to get started.'}], this.getTools(), this, true);
+    const packageJson = await executeCommand('cat package.json', this.repoName);
+    const messages = await queryLlmWTools([{role: 'system', content: SystemPrompt(this.task, this.spec, packageJson)}, {role: 'user', content: 'Select a tool to get started.'}], this.getTools(), this, true);
     
     this.approved = true;
     return await this.checkChangesAndMaybeApprove(messages);
@@ -211,7 +212,7 @@ class Coder {
   }
 }
 
-const SystemPrompt = (task, spec) => `You are a tech lead software engineer tasked with overseeing the completion of a specific project task, guided by a detailed spec that you have previously prepared. Your role involves coordinating the efforts of your team to implement changes in a Git repository, starting from a clean slate and culminating in a new commit that encapsulates all the modifications made by your team. Your leadership and technical expertise are crucial in guiding the project to a successful completion.
+const SystemPrompt = (task, spec, packageJson) => `You are a tech lead software engineer tasked with overseeing the completion of a specific project task, guided by a detailed spec that you have previously prepared. Your role involves coordinating the efforts of your team to implement changes in a Git repository, starting from a clean slate and culminating in a new commit that encapsulates all the modifications made by your team. Your leadership and technical expertise are crucial in guiding the project to a successful completion.
 
 To accomplish this task, you have the following tools at your disposal:
 - \`editCode(path, spec)\`: Modify existing code at the specified path, based on a focused spec.
@@ -233,6 +234,11 @@ Upon fulfilling the task and spec, and after thorough verification that the code
 - Use the \`pass()\` tool to commit the changes. This action signifies your confidence that the code is polished and aligns with the project's standards.
 
 In summary, your role as a tech lead is to provide clear, detailed guidance, coordinate the implementation efforts, ensure the quality of the code through testing, and maintain a clean and focused commit history. Your expertise and oversight are key to the successful and efficient completion of the project task.
+
+Try to avoid adding new dependencies unless absolutely necessary. Here is the package.json so that you can see what is already included in the project:
+\`\`\`json
+${JSON.stringify(packageJson)}
+\`\`\`
 
 **Task:**
 \`\`\`json
