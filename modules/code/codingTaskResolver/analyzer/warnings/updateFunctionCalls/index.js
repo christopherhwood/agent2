@@ -17,7 +17,7 @@ async function warnAboutInvalidFunctionCalls(oldCode, newCode, repoName) {
       warning += `Function ${func.name} has been deleted or renamed. Call sites:\n${func.callSites.join('\n')}\n`;
     }
     for (const func of functionsWithChangedReturnTypes) {
-      warning += `Function ${func.functionName} has changed its return type from ${func.oldReturnTypes.join(' | '} to ${func.newReturnTypes.join(' | ')}. This may affect existing logic that relies on the previous return type. Please review and update the call sites as necessary.\n`;
+      warning += `Function ${func.functionName} has changed its return type from ${func.oldReturnTypes.join(' | ')} to ${func.newReturnTypes.join(' | ')}. This may affect existing logic that relies on the previous return type. Please review and update the call sites as necessary.\n`;
     }
     return warning;
   }
