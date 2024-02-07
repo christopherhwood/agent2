@@ -72,7 +72,7 @@ class Coder {
     await addFile(path, spec, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
-    const lint = await executeCommand('npm run lint -- .', this.repoName);
+    const lint = await executeCommand('cd ./backend npm run lint -- .', this.repoName);
     return `**Contents of ${path}:**\n\`\`\`\n${contents}\n\`\`\`\n**Linting Output:**\n\`\`\`\n${lint}\n\`\`\``;
   }
 
@@ -87,7 +87,7 @@ class Coder {
     const message = await editCode(path, spec, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
-    const lint = await executeCommand('npm run lint -- .', this.repoName);
+    const lint = await executeCommand('cd ./backend npm run lint -- .', this.repoName);
     return `${message}\n\n**Linting Output:**\n\`\`\`\n${lint}\n\`\`\`\n**Contents of ${path} after editing:**\n\`\`\`\n${contents}\n\`\`\``;
   }
 
@@ -97,7 +97,7 @@ class Coder {
   }
 
   async runTests() {
-    return await executeCommand('npm run test', this.repoName);
+    return await executeCommand('cd ./backend npm run test', this.repoName);
   }
 
   async gitDiff() {
@@ -223,6 +223,8 @@ To accomplish this task, you have the following tools at your disposal:
 - \`pass()\`: Mark the task as complete and ready for review, committing all changes to the repository.
 
 As you analyze the spec and task, your responsibility is to create highly detailed specs for code changes that need to be carried out by your team. These specs should provide clear, high-level guidance without delving into the specifics of implementation. This approach ensures that your team has the necessary direction to make the intended changes while retaining the flexibility to adapt to the existing codebase.
+
+If you determine that the task has already been completed then you should just pass the task. Do NOT invent work or read too deeply into a task to try to find something to do. For example if the task is just to ensure a parameter is included in the function signature and you see that it is, then stop and pass the task. Do NOT try to find other things to do like "integrate the parameter more deeply". Your job is to take a limited reading of task and spec and execute only the critical and required parts.
 
 ** VERY IMPORTANT:** Do NOT make assumptions when writing specs. Do NOT assume the existence of modules, frameworks, files, or properties on objects (not even id)! You have access to the command line and should be able to verify any assumptions or questions you have (for example, use grep, cat, etc). It's important that you not be lazy issuing instructions and to not make mistakes including relying on assumptions or guesses.
 
