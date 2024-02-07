@@ -5,17 +5,17 @@ const { createEmbedding } = require('../../../search/ingestion/embedder');
 const { selectRelatedCode } = require('../../../search/output/searchCode');
 const { warnAboutInvalidFunctionCalls } = require('../analyzer/warnings/updateFunctionCalls');
 
-async function editCode(filePath, spec, repoName) {
+async function editCode(filePath, spec, styleGuide, repoName) {
   if (!filePath.startsWith('./')) {
     filePath = `./${filePath}`;
   }
-  return await editCodeLoop(filePath, spec, [], repoName);
+  return await editCodeLoop(filePath, spec, styleGuide, [], repoName);
 }
 
-async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining = 3) {
+async function editCodeLoop(filePath, spec, styleGuide, messages, repoName, triesRemaining = 3) {
   const specEmbedding = await createEmbedding(spec);
   const relevantSnippets = await selectRelatedCode(repoName, specEmbedding, [filePath]);
-  const res = await sendEditCodeRequest(filePath, spec, relevantSnippets, messages, repoName);
+  const res = await sendEditCodeRequest(filePath, spec, relevantSnippets, styleGuide, messages, repoName);
   const edits = res.edits;
   let outputs = [];
   for (const edit of edits) {
@@ -32,7 +32,7 @@ async function editCodeLoop(filePath, spec, messages, repoName, triesRemaining =
   const errorEdits = edits.filter(edit => edit.error);
   if (errorEdits.length > 0) {
     if (triesRemaining > 0) {
-      const editRes = await editCodeLoop(filePath, spec, [...messages, {role: 'assistant', content: JSON.stringify(res)}, {role: 'user', content: fixErrorQuery(edits)}], repoName, triesRemaining - 1);
+      const editRes = await editCodeLoop(filePath, spec, styleGuide, [...messages, {role: 'assistant', content: JSON.stringify(res)}, {role: 'user', content: fixErrorQuery(edits)}], repoName, triesRemaining - 1);
       if (editRes.trim().length > 0) {
         outputs.push(editRes);
       }
@@ -55,9 +55,9 @@ const fixErrorQuery = (edits) => {
   return query;
 };
 
-async function sendEditCodeRequest(filePath, spec, relevantSnippets, messages, repoName) {
-  const editQuery = await query(filePath, repoName);
-  const res = await queryLlmWithJsonCheck([{role: 'system', content: createEditCodeSystemPrompt(spec, relevantSnippets)}, {role: 'user', content: editQuery}, ...messages], validateEditCode);
+async function sendEditCodeRequest(filePath, spec, relevantSnippets, styleGuide, messages, repoName) {
+  const editQuery = await query(filePath, relevantSnippets, repoName);
+  const res = await queryLlmWithJsonCheck([{role: 'system', content: createEditCodeSystemPrompt(styleGuide, spec)}, {role: 'user', content: editQuery}, ...messages], validateEditCode);
   return res;
 }
 
@@ -122,26 +122,33 @@ const validateEditCode = (response) => {
   return response;
 };
 
-const query = async (filePath, repoName) => {
+const query = async (filePath, relevantSnippets, repoName) => {
   const fileContents = await executeCommand(`cat ${filePath}`, repoName);
   return `Write the new code and the code to replace for the file at ${filePath}. Use the json format {edits: [{originalCode: '', newCode: ''}]} to return the code.
   
   The existing code at ${filePath} is:
   \`\`\`javascript
   ${fileContents}
+  \`\`\`
+  
+  Potentially relevant code snippets:
+  \`\`\`json
+  ${JSON.stringify(relevantSnippets)}
   \`\`\``;
 };
 
-const createEditCodeSystemPrompt = (spec, relevantSnippets) => {return `You are a senior software engineer working on a programming task. You are provided a file path identifying the file that we are editing, and an engineering spec for a task.
+const createEditCodeSystemPrompt = (styleGuide, spec) => {return `You are a senior software engineer working on a programming task. You are provided a file path identifying the file that we are editing, and an engineering spec for a task.
 
-Your job is to write the javascript code for the new file. Your output will be structured as follows, detailing the edits you propose:
+Your job is to write the javascript code for the new file. Each edit should be lean and concise. Use multiple edits if necessary to change code in different parts of the file. If no edits are required to satisfy the task and spec then you may return an empty array of edits. 
+
+Your output will be structured as follows, detailing the edits you propose:
 \`\`\`json
 {
   "edits": [
     {
       "id": "a unique id",
       "thoughts": "Your thoughts on the edit",
-      "originalCode": "Exact subsection of the original code to be replaced, including comments and spacing. This must match _exactly_ the code in the file. If it does not, the command will fail. If the code contains comments, the comments must match _exactly_ what is in the source file. Otherwise, the command will fail. The original code will be removed in its entirety and replaced with the contents of newCode. Ensure you are only deleting the code that needs to be replaced. If you delete too much, you will break the codebase. If you delete too little, you will not fix the issue. Be careful.",
+      "originalCode": "Exact subsection of the original code to be replaced, including comments and spacing. This cannot be an empty string. This must match _exactly_ the code in the file. If it does not, the command will fail. If the code contains comments, the comments must match _exactly_ what is in the source file. Otherwise, the command will fail. The original code will be removed in its entirety and replaced with the contents of newCode. Ensure you are only deleting the code that needs to be replaced. If you delete too much, you will break the codebase. If you delete too little, you will not fix the issue. Be careful.",
       "newCode": "The revised code snippet that corrects the identified issue. This will replace the originalCode exactly as written, including any comments, verbatim."
     },
     // Additional edits as necessary
@@ -171,14 +178,14 @@ Make sure any comments you add are not too tied to the task at hand and are gene
 
 Do NOT remove or change code that is seemingly unrelated to the task at hand. It's very likely you may be accidentally breaking something in the codebase. If that needs to be changed there will be a separate task asking you to do so. For now, focus only on the task at hand.
 
+Below is a repository-specific style guide for your reference:
+\`\`\`markdown
+${styleGuide}
+\`\`\`
+
 The engineering spec is below:
 \`\`\`json
 ${JSON.stringify(spec)}
-\`\`\`
-
-Potentially relevant code snippets:
-\`\`\`json
-${JSON.stringify(relevantSnippets)}
 \`\`\``;};
 
 module.exports = { editCode, tryToEditCode };

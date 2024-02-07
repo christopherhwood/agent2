@@ -121,7 +121,7 @@ router.post('/debug-only-send-payload', async (ctx) => {
     const jsonPayload = JSON.parse(payload);
     const res = await openai.chat.completions.create(jsonPayload);
     console.log(JSON.stringify(res));
-    ctx.response = res;
+    ctx.body = res;
     ctx.status = 200;
   } catch (err) {
     console.error(err);

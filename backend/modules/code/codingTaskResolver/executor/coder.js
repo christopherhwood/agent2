@@ -6,11 +6,11 @@ const { editCode } = require('./editCode');
 
 
 class Coder {
-  constructor(task, spec, repoName) {
+  constructor(task, spec, repoName, styleGuide) {
     this.task = task;
     this.spec = spec;
     this.repoName = repoName;
-    this.approved = false;
+    this.styleGuide = styleGuide;
   }
 
   async hasChanges() {
@@ -22,36 +22,17 @@ class Coder {
     const packageJson = await executeCommand('cat backend/package.json', this.repoName);
     const messages = await queryLlmWTools([{role: 'system', content: SystemPrompt(this.task, this.spec, packageJson)}, {role: 'user', content: 'Select a tool to get started.'}], this.getTools(), this, true);
     
-    this.approved = true;
     return await this.checkChangesAndMaybeApprove(messages);
   }
 
   async checkChangesAndMaybeApprove(messages) {
     if (this.hasChanges()) {
-      if (!this.approved) {
-        return await this.getApproval(messages);
-      }
-
       // get the id of the last message tool call
       const lastMessage = messages[messages.length - 1];
       const lastToolCallId = lastMessage.tool_calls[0].id;
 
       const commitMessage = await queryLlm([{role: 'system', content: `You are a tech lead software engineer overseeing the completion of the following task and tech spec:\n**Task:**\n\`\`\`json\n${JSON.stringify(this.task)}\n\`\`\`\n\n**Spec:**\n\`\`\`markdown\n${this.spec}\`\`\``}, ...messages.splice(1), {role: 'tool', tool_call_id: lastToolCallId, name: 'pass', content: 'Please give a commit message for the changes you made. You may use markdown to describe the changes, but keep the message concise and useful. Just write straight markdown, no need to wrap it in backticks.'}]);
       this.commitChanges(commitMessage);
-    }
-  }
-
-  async getApproval(oldMessages) {
-    if (!this.approved) {
-      this.approved = true;
-      const diff = await this.gitDiff();
-
-      // get the id of the last message tool call
-      const lastMessage = oldMessages[oldMessages.length - 1];
-      const lastToolCallId = lastMessage.tool_calls[0].id;
-
-      const messages =  await queryLlmWTools([...oldMessages, {role: 'tool', tool_call_id: lastToolCallId, name: 'pass', content: `Before committing these changes, take a very critical look at this diff, like Linus Torvalds level of critical. Be mindful of integration points both internal and external to the system. Be sure they receive minimal changes and only the changes that are required by the task at hand. Pay particular attention to objects and any new properties added to them. Be sure those properties are required by the task and avoid altering object properties without just cause.\nTake action on any changes you deem necessary, or pass to go ahead and commit this change.\n\nGit Diff of changes:\n\`\`\`${diff}\`\`\``}], this.getTools(), this, true);
-      return await this.checkChangesAndMaybeApprove(messages);
     }
   }
 
@@ -68,8 +49,7 @@ class Coder {
   }
   
   async createFile(path, spec) {
-    this.approved = false;
-    await addFile(path, spec, this.repoName);
+    await addFile(path, spec.veryMinimal, this.styleGuide, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
     const lint = await executeCommand('cd ./backend && npm run lint -- .', this.repoName);
@@ -77,14 +57,12 @@ class Coder {
   }
 
   async deleteFile(path) {
-    this.approved = false;
     await executeCommand(`rm ${path}`, this.repoName);
     return `Deleted ${path}`;
   }
 
   async editCode(path, spec) {
-    this.approved = false;
-    const message = await editCode(path, spec, this.repoName);
+    const message = await editCode(path, spec.veryMinimal, this.styleGuide, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
     const lint = await executeCommand('cd ./backend && npm run lint -- .', this.repoName);
@@ -92,7 +70,6 @@ class Coder {
   }
 
   async executeCommand(command) {
-    this.approved = false;
     return await executeCommand(command, this.repoName);
   }
 
@@ -119,7 +96,14 @@ class Coder {
                 description: 'The relative path to the file to create. Paths must be relative to the root of the repository.'
               },
               spec: {
-                type: 'string',
+                type: 'object',
+                properties: {
+                  veryMinimal: { type: 'string' },
+                  minimal: { type: 'string' },
+                  detailed: { type: 'string' },
+                  veryDetailed: { type: 'string' }
+                },
+                required: ['veryMinimal', 'minimal', 'detailed', 'veryDetailed'], 
                 description: 'A focused spec for the code to add to the new file. This should be in markdown format and provide instructions for your teammate who will carry out the new file creation. As you have not seen the code yet, avoid making specific code suggestions. Be especially careful about assuming the properties of objects unless you know the properties for sure. In the case of adding validations, it\'s better to add less and be correct than to add more and be incorrect. If unsure about how to carry out the intended edit, indicate that in the spec and provide optionality for the editor to adjust based on the state of the code.'
               }
             },
@@ -157,8 +141,15 @@ class Coder {
                 description: 'The relative path to the file to modify. Paths must be relative to the root of the repository.'
               },
               spec: {
-                type: 'string',
-                description: 'A focused spec for this edit. This should be in markdown format and provide instructions for your teammate who will carry out the edit. As you have not seen the code yet, avoid making specific code suggestions. Be especially careful about assuming the properties of objects unless you know the properties for sure. In the case of adding validations, it\'s better to add less and be correct than to add more and be incorrect. If unsure about how to carry out the intended edit, indicate that in the spec and provide optionality for the editor to adjust based on the state of the code.'
+                type: 'object',
+                properties: {
+                  veryMinimal: { type: 'string' },
+                  minimal: { type: 'string' },
+                  detailed: { type: 'string' },
+                  veryDetailed: { type: 'string' }
+                },
+                required: ['veryMinimal', 'minimal', 'detailed', 'veryDetailed'],
+                description: 'A focused spec for this edit. This should be in markdown format (don\'t wrap in backticks though) and provide instructions for your teammate who will carry out the edit. Make the instructions clear and avoid vague terminology like \'make it better\'. As you have not seen the code yet, avoid making specific code suggestions. Be especially careful about assuming the properties of objects unless you know the properties for sure. In the case of adding validations, it\'s better to add less and be correct than to add more and be incorrect.'
               },
             },
             required: ['path', 'spec']
@@ -222,9 +213,13 @@ To accomplish this task, you have the following tools at your disposal:
 - \`runTests()\`: Execute the project's test suite to ensure code changes haven't introduced regressions.
 - \`pass()\`: Mark the task as complete and ready for review, committing all changes to the repository.
 
-As you analyze the spec and task, your responsibility is to create specs for code changes that need to be carried out by your team. These specs should provide clear, high-level guidance without delving into the specifics of implementation. **IMPORTANT**: Do NOT include code snippets in your spec. This approach ensures that your team has the necessary direction to make the intended changes while retaining the flexibility to adapt to the existing codebase.
+After you take one of the actions below, you will receive a response. The response may include warnings, errors, or lint results. Don't ignore these. Warnings may not require any action, but lint errors and other errors must be addressed.
 
-If you determine that the task has already been completed then you should just pass the task. Do NOT invent work or read too deeply into a task to try to find something to do. For example if the task is just to ensure a parameter is included in the function signature and you see that it is, then stop and pass the task. Do NOT try to find other things to do like "integrate the parameter more deeply". Your job is to take a limited reading of task and spec and execute only the critical and required parts.
+As you analyze the spec and task below, your responsibility is to create specs for code changes that need to be carried out by your team. These specs should provide clear, high-level guidance without delving into the specifics of implementation. 
+
+**IMPORTANT**: Do NOT include code snippets in your spec. This approach ensures that your team has the necessary direction to make the intended changes while retaining the flexibility to adapt to the existing codebase.
+
+If you determine that the task has already been completed then you should just pass the task.
 
 ** VERY IMPORTANT:** Do NOT make assumptions when writing specs. Do NOT assume the existence of modules, frameworks, files, or properties on objects (not even id)! You have access to the command line and should be able to verify any assumptions or questions you have (for example, use grep, cat, etc). It's important that you not be lazy issuing instructions and to not make mistakes including relying on assumptions or guesses.
 
@@ -242,12 +237,12 @@ Try to avoid adding new dependencies unless absolutely necessary. Here is the pa
 ${JSON.stringify(packageJson)}
 \`\`\`
 
-**Task:**
+**Your Task:**
 \`\`\`json
 ${JSON.stringify(task)}
 \`\`\`
 
-**Spec:**
+**Task Engineering Spec:**
 \`\`\`markdown
 ${spec}
 \`\`\``;
