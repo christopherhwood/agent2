@@ -72,7 +72,7 @@ class Coder {
     await addFile(path, spec, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
-    const lint = await executeCommand('cd ./backend npm run lint -- .', this.repoName);
+    const lint = await executeCommand('cd ./backend && npm run lint -- .', this.repoName);
     return `**Contents of ${path}:**\n\`\`\`\n${contents}\n\`\`\`\n**Linting Output:**\n\`\`\`\n${lint}\n\`\`\``;
   }
 
@@ -87,7 +87,7 @@ class Coder {
     const message = await editCode(path, spec, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
-    const lint = await executeCommand('cd ./backend npm run lint -- .', this.repoName);
+    const lint = await executeCommand('cd ./backend && npm run lint -- .', this.repoName);
     return `${message}\n\n**Linting Output:**\n\`\`\`\n${lint}\n\`\`\`\n**Contents of ${path} after editing:**\n\`\`\`\n${contents}\n\`\`\``;
   }
 
@@ -97,7 +97,7 @@ class Coder {
   }
 
   async runTests() {
-    return await executeCommand('cd ./backend npm run test', this.repoName);
+    return await executeCommand('cd ./backend && npm run test', this.repoName);
   }
 
   async gitDiff() {
