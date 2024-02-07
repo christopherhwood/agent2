@@ -1,6 +1,6 @@
 // Sidebar.js
 import React from 'react';
-import { SidebarContainer, SidebarItem, SidebarTitle } from './SidebarStyles';
+import { SidebarContainer, SidebarItem, SidebarTitle, StatusIndicator } from './SidebarStyles';
 
 const artifacts = [
   { name: 'MoSCoW Method', id: 1 },
@@ -16,7 +16,10 @@ const Sidebar = () => {
     <SidebarContainer>
       <SidebarTitle>Project Artifacts</SidebarTitle>
       {artifacts.map((artifact) => (
-        <SidebarItem key={artifact.id}>{artifact.name}</SidebarItem>
+        <SidebarItem key={artifact.id}>
+          <StatusIndicator status={artifact.status} />
+          {artifact.name}
+        </SidebarItem>
       ))}
     </SidebarContainer>
   );
