@@ -12,7 +12,9 @@ const { resolveTasks } = require('./modules/code');
 const { getRepoContext } = require('./modules/summary/codePicker');
 const { connectDB } = require('./modules/db/db');
 const { updateRepoEmbeddings } = require('./modules/search/ingestion/traverseRepo');
+const { genTaskDeepDive } = require('./modules/plan/taskDeepDiver');
 const { pickCodeContext } = require('./modules/search/output');
+
 
 const openai = new OpenAI(process.env.OPENAI_API_KEY);
 connectDB();
@@ -137,6 +139,25 @@ router.post('/debug-only-search-code', async (ctx) => {
     return ctx.response.body = context;
   } catch (err) {
     console.error(err);
+  }
+});
+
+// New API endpoint to generate a deep dive into a task
+router.post('/generate-task-deep-dive', async (ctx) => {
+  try {
+    const { taskDescription, repositorySummary } = ctx.request.body;
+    if (!taskDescription || !repositorySummary) {
+      ctx.status = 400;
+      ctx.body = { error: 'Both taskDescription and repositorySummary are required' };
+      return;
+    }
+    const result = await genTaskDeepDive(taskDescription, repositorySummary);
+    ctx.status = 200;
+    ctx.body = { deepDiveResult: result };
+  } catch (error) {
+    console.error('Error in /generate-task-deep-dive:', error);
+    ctx.status = 500;
+    ctx.body = { error: 'Error processing your request' };
   }
 });
 
