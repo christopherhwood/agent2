@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 
+console.log(mongoose);
+console.log(mongoose.Schema);
+
 const dbName = 'agent';
 const uri = `mongodb+srv://${process.env.MONGODB_USERNAME}:${encodeURIComponent(process.env.MONGODB_PASSWORD)}@threadly.tamku2f.mongodb.net/${dbName}`;
 
@@ -13,4 +16,9 @@ async function connectDB() {
   }
 }
 
-module.exports = { connectDB };
+async function disconnectDB() {
+  await mongoose.disconnect();
+  console.log('Disconnected from MongoDB');
+}
+
+module.exports = { connectDB, disconnectDB };

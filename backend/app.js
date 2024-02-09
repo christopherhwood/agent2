@@ -1,4 +1,3 @@
-require('dotenv').config();  // Ensure environment variables are loaded
 const fs = require('fs');
 const Koa = require('koa');
 const Router = require('@koa/router');
@@ -10,14 +9,12 @@ const { generateSummary } = require('./modules/summary');
 const { generatePlan } = require('./modules/plan');
 const { resolveTasks } = require('./modules/code');
 const { getRepoContext } = require('./modules/summary/codePicker');
-const { connectDB } = require('./modules/db/db');
 const { updateRepoEmbeddings } = require('./modules/search/ingestion/traverseRepo');
 const { genTaskDeepDive } = require('./modules/plan/taskDeepDiver');
 const { pickCodeContext } = require('./modules/search/output');
 
 
 const openai = new OpenAI(process.env.OPENAI_API_KEY);
-connectDB();
 
 const app = new Koa();
 const router = new Router();
@@ -171,7 +168,4 @@ router.prefix('/api');
 // Apply the /api prefix to all routes
 app.use(router.routes(), router.allowedMethods());
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+module.exports = app;
