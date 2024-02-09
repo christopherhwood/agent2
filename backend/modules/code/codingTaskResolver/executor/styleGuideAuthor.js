@@ -10,11 +10,11 @@ class StyleGuideAuthor {
     const dirTree = await this.viewDirectoryTree();
     const packageJson = await this.viewPackageJson();
 
-    const messages = await queryLlmWTools([{role: 'system', content: ResearchSystemPrompt}, {role: 'user', content: query(this.repoName, dirTree, packageJson)}]);
+    const messages = await queryLlmWTools([{role: 'system', content: ResearchSystemPrompt}, {role: 'user', content: query(this.repoName, dirTree, packageJson)}], this.getTools(), this);
 
     const notes = messages.filter(m => m.role === 'assistant' && m.content).map(m => m.content).join('\n\n');
 
-    const styleGuide = queryLlm([{role: 'system', content: WriterSystemPrompt}, {role: 'user', content: `I am providing you with your recent notes on the ${this.repoName} repository. Now you must write the style guide. Best of luck!\n\n# Notes:\n\n${notes}`}]);
+    const styleGuide = queryLlm([{role: 'system', content: WriterSystemPrompt}, {role: 'user', content: `I am providing you with your recent notes on the ${this.repoName} repository. Now you must write the style guide. Write the style guide in markdown but without enclosing it in backticks. Best of luck!\n\n# Notes:\n\n${notes}`}]);
     return styleGuide;
   }
 
@@ -23,7 +23,7 @@ class StyleGuideAuthor {
   }
 
   async viewDirectoryTree() {
-    return await executeCommand('tree -I "node_modules|.git|package-lock.json', this.repoName);
+    return await executeCommand('tree -I "node_modules|.git|package-lock.json"', this.repoName);
   }
 
   async viewPackageJson() {
@@ -105,40 +105,34 @@ ${JSON.stringify(packageJson)}
 const WriterSystemPrompt = `You are an expert code style guide author. You can look at just a few code examples from a repository and develop a guide for the team to follow.
 
 When you encounter a new repository, you quickly flip through a few files and take notes on the existing style. You always pay attention to the following:
-- How are the files organized?
+- How are the files organized? What is overall architecture of the codebase?
 - How are the functions and classes named?
-- How are the comments written?
-- How are the imports organized?
-- How are the tests written?
-- How are the dependencies managed?
+- How are the comments written? If they're using jsdoc, do they use typedefs?
+- How are the imports organized? Are they always at the top of the file? Are there any conditional imports?
+- How are the tests written? Where are the tests? What testing framework is used? What style tests are supported? How do they do mocking?
+- How are the dependencies managed? What 3rd party libraries are used?
 - How are the error messages written?
 - How are the logs written?
 - How are the environment variables used?
 - How are the constants defined?
-- What testing framework is used?
-- What 3rd party libraries are used?
-- What is overall architecture of the codebase?
 
-You then use this information to create a style guide for the team to follow. You should include examples from the codebase to illustrate your points. You should also include a section on how to write new code in the style of the existing codebase.`;
+You then use this information to create a style guide for the team to follow. You should include examples from the codebase to illustrate your points.`;
 
 const ResearchSystemPrompt = `You are an expert code style guide author. You can look at just a few code examples from a repository and develop a guide for the team to follow.
 
 When you encounter a new repository, you quickly flip through a few files and take notes on the existing style. You always pay attention to the following:
-- How are the files organized?
+- How are the files organized? What is overall architecture of the codebase?
 - How are the functions and classes named?
-- How are the comments written?
-- How are the imports organized?
-- How are the tests written?
-- How are the dependencies managed?
+- How are the comments written? If they're using jsdoc, do they use typedefs?
+- How are the imports organized? Are they always at the top of the file? Are there any conditional imports?
+- How are the tests written? Where are the tests? What testing framework is used? What style tests are supported? How do they do mocking?
+- How are the dependencies managed? What 3rd party libraries are used?
 - How are the error messages written?
 - How are the logs written?
 - How are the environment variables used?
 - How are the constants defined?
-- What testing framework is used?
-- What 3rd party libraries are used?
-- What is overall architecture of the codebase?
 
-You then use this information to create a style guide for the team to follow. You should include examples from the codebase to illustrate your points. You should also include a section on how to write new code in the style of the existing codebase.
+You then use this information to create a style guide for the team to follow. You should include examples from the codebase to illustrate your points.
 
 You have available to you the following tools: 
 - viewFile(filePath): This function takes a file path (must be a relative path from the root of the directory) and returns the contents of the file.

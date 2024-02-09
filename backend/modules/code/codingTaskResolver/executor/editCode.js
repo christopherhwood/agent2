@@ -4,6 +4,7 @@ const { Container, executeCommand } = require('../../../../dockerOperations');
 const { createEmbedding } = require('../../../search/ingestion/embedder');
 const { selectRelatedCode } = require('../../../search/output/searchCode');
 const { warnAboutInvalidFunctionCalls } = require('../analyzer/warnings/updateFunctionCalls');
+const { analyzeNewCode } = require('../analyzer/index');
 
 async function editCode(filePath, spec, styleGuide, repoName) {
   if (!filePath.startsWith('./')) {
@@ -57,8 +58,36 @@ const fixErrorQuery = (edits) => {
 
 async function sendEditCodeRequest(filePath, spec, relevantSnippets, styleGuide, messages, repoName) {
   const editQuery = await query(filePath, relevantSnippets, repoName);
-  const res = await queryLlmWithJsonCheck([{role: 'system', content: createEditCodeSystemPrompt(styleGuide, spec)}, {role: 'user', content: editQuery}, ...messages], validateEditCode);
-  return res;
+  const firstEdit = await queryLlmWithJsonCheck([{role: 'system', content: createEditCodeSystemPrompt(styleGuide, spec)}, {role: 'user', content: editQuery}, ...messages], validateEditCode);
+
+  // Copy the source file to a temp location
+  const container = await Container.Create(repoName);
+  const id = uuidv4().toString();
+  await container.executeCommand(`mkdir -p /usr/src && cp ${filePath} /usr/src/temp-${id}`);
+  let successful = [];
+  for (const edit of firstEdit.edits) {
+    try {
+      await tryToEditCode(filePath, edit, repoName);
+      successful.push(edit);
+    } catch {
+      // Do nothing   
+    }
+  }
+
+  if (!successful.length) {
+    await container.destroy();
+    return firstEdit;
+  }
+
+  const newFileContents = await container.executeCommand(`cat ${filePath}`);
+  const diff = await container.executeCommand(`git diff ${filePath}`);
+
+  const secondEdit = await queryLlmWithJsonCheck([{role: 'system', content: createEditCodeSystemPrompt(styleGuide, spec)}, {role: 'user', content: editQuery}, ...messages, {role: 'assistant', content: JSON.stringify({edits: successful})}, {role: 'user', content: `Your edits have been applied.\n\nNow, take a close look at the new code below. Make new edits to fix any style guide deviations or areas where bugs coudld be introduced due to lack of error handling, potentially improper use of a function in terms of parameters or return type, or use of properties that may not be defined on an object. \nMake sure all edits are inline with the spec: ${spec}.\nReturn your new edits in json format.\n\nHere is the style guide:\n\n\`\`\`markdown\n${styleGuide}\n\`\`\`\n\nHere is the new code:\n\n\`\`\`javascript\n${newFileContents}\n\`\`\`\n\nThe change's diff is shown below to give context on what was added (+) and removed (-):\n${diff}`}], validateEditCode);
+
+  // Undo edits
+  await container.executeCommand(`cp /usr/src/temp-${id} ${filePath}`);
+  await container.destroy();
+  return {edits: firstEdit.edits.concat(secondEdit.edits)};
 }
 
 async function tryToEditCode(filePath, edit, repoName) {
@@ -74,6 +103,8 @@ async function tryToEditCode(filePath, edit, repoName) {
     // Create a container
     const container = await Container.Create(repoName);
 
+    const oldFileContents = await container.executeCommand(`cat ${filePath}`);
+
     // Echo the code to a temp file in the container
     await container.executeCommand(`cat << 'EOF' > /usr/src/temp-${uniqueId}\n${newCode}\nEOF`);
 
@@ -82,18 +113,27 @@ async function tryToEditCode(filePath, edit, repoName) {
     // Insert the code into the specified file using the /usr/bin/insertCode.js script
     let output = await container.executeCommand(`/usr/bin/replaceCode.js ${filePath} /usr/src/original-${uniqueId} /usr/src/temp-${uniqueId}`);
     
-    // Destroy the container
-    const fileContents = await container.executeCommand(`cat ${filePath}`);
     try {
       if (output && output.trim().length > 0) {
         if (output.includes('Error:')) {
           output = '# Error\n' + output;
-          output += `\n\n**Original File Contents at ${filePath}:**\n\`\`\`\n` + fileContents + '\n```'; 
+          output += `\n\n**Original File Contents at ${filePath}:**\n\`\`\`\n` + oldFileContents + '\n```'; 
           throw new Error(output);
         }
       } else {
+        const newFileContents = await container.executeCommand(`cat ${filePath}`);
         output = '';
-        const functionCallWarning = await warnAboutInvalidFunctionCalls(originalCode, newCode, repoName);
+        if (edit.risk.length > 0) {
+          output += '\n\nThe edit has the following risk: ' + edit.risk;
+        }
+        if (edit.style.length > 0) {
+          output += '\n\nThe edit has the following style deviation: ' + edit.style;
+        }
+        const { analyzerErrors } = analyzeNewCode(newCode);
+        for (const err of analyzerErrors) {
+          output += `\n\n**ERROR:**\n${err}`;
+        }
+        const functionCallWarning = await warnAboutInvalidFunctionCalls(oldFileContents, newFileContents, repoName);
         console.log('functionCallWarning:', functionCallWarning);
         if (functionCallWarning) {
           output += '\n\n**WARNING:**\n' + functionCallWarning;
@@ -102,9 +142,8 @@ async function tryToEditCode(filePath, edit, repoName) {
     } finally {
       await container.destroy();
     }
-    return output;
+    return output.trim();
   }
-  throw new Error('Error: File not edited - invalid contents');
 }
 
 const validateEditCode = (response) => {
@@ -115,8 +154,8 @@ const validateEditCode = (response) => {
     throw new Error('Edits must be an array');
   }
   for (const edit of response.edits) {
-    if (!edit.originalCode || (!edit.newCode && typeof edit.newCode !== 'string')) {
-      throw new Error('Each edit must contain an "originalCode" and "newCode" field');
+    if (!edit.originalCode || (!edit.newCode && typeof edit.newCode !== 'string') || !edit.id || typeof edit.risk !== 'string' || typeof edit.style !== 'string') {
+      throw new Error('Each edit must contain an "originalCode", "newCode", "id", "risk", and "style" field');
     }
   }
   return response;
@@ -139,7 +178,11 @@ const query = async (filePath, relevantSnippets, repoName) => {
 
 const createEditCodeSystemPrompt = (styleGuide, spec) => {return `You are a senior software engineer working on a programming task. You are provided a file path identifying the file that we are editing, and an engineering spec for a task.
 
-Your job is to write the javascript code for the new file. Each edit should be lean and concise. Use multiple edits if necessary to change code in different parts of the file. If no edits are required to satisfy the task and spec then you may return an empty array of edits. 
+Your job is to write the javascript code for the new file. Each edit should be lean and concise. Use multiple edits if necessary to change code in different parts of the file (for example changing imports and writing a function). If no edits are required to satisfy the task and spec then you may return an empty array of edits.
+
+You do not have to follow the spec exactly. The specs are intentionally written in a vague manner to allow for your creativity and flexibility. For example, if the spec asks you to better utilize an object, you can use your own judgement and understanding of the code to determine if anything needs to be done. If you're not sure how to better use the object or if you think the object is already being used in the best way, you can ignore the spec and return an empty array of edits.
+
+This means that you are responsible for all bugs you write. Recklessly accessing properties that don't exist or passing incorrect arguments to functions or misusing the returned values of functions can all introduce bugs. You should avoid doing this at all costs.
 
 Your output will be structured as follows, detailing the edits you propose:
 \`\`\`json
@@ -147,9 +190,10 @@ Your output will be structured as follows, detailing the edits you propose:
   "edits": [
     {
       "id": "a unique id",
-      "thoughts": "Your thoughts on the edit",
-      "originalCode": "Exact subsection of the original code to be replaced, including comments and spacing. This cannot be an empty string. This must match _exactly_ the code in the file. If it does not, the command will fail. If the code contains comments, the comments must match _exactly_ what is in the source file. Otherwise, the command will fail. The original code will be removed in its entirety and replaced with the contents of newCode. Ensure you are only deleting the code that needs to be replaced. If you delete too much, you will break the codebase. If you delete too little, you will not fix the issue. Be careful.",
-      "newCode": "The revised code snippet that corrects the identified issue. This will replace the originalCode exactly as written, including any comments, verbatim."
+      "risk": "How the edit could introduce bugs. Consider how confident you are in the properties being accessed on objects, the parameters and return types of functions used, and obviously error handling. The point is to also explore risks inherent in using a dynamic language like Javascript. If there are none, return an empty string.",
+      "style": "Explain any deviations from the style guide and why. Do NOT explain what you did correctly, only focus on the deviations. If there are none, then return an empty string.",
+      "originalCode": "Exact subsection of the original code to be replaced, including comments and spacing. This cannot be an empty string. This must match _exactly_ the code in the file. If it does not, the command will fail. If the code contains comments, the comments must match _exactly_ what is in the source file. The original code will be removed in its entirety and replaced with the contents of newCode. Ensure you are only deleting the code that needs to be replaced. If you delete too much, you will break the codebase. If you delete too little, you will not fix the issue. Be careful.",
+      "newCode": "The revised code snippet that corrects the identified issue. This will replace the originalCode exactly as written, including any comments, verbatim. Must follow the style guide below."
     },
     // Additional edits as necessary
   ]
@@ -178,7 +222,7 @@ Make sure any comments you add are not too tied to the task at hand and are gene
 
 Do NOT remove or change code that is seemingly unrelated to the task at hand. It's very likely you may be accidentally breaking something in the codebase. If that needs to be changed there will be a separate task asking you to do so. For now, focus only on the task at hand.
 
-Below is a repository-specific style guide for your reference:
+Below is a repository-specific style guide. Follow the style guide when writing new code:
 \`\`\`markdown
 ${styleGuide}
 \`\`\`

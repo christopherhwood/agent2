@@ -6,7 +6,7 @@ const { editCode } = require('./editCode');
 
 
 class Coder {
-  constructor(task, spec, repoName, styleGuide) {
+  constructor(task, spec, styleGuide, repoName) {
     this.task = task;
     this.spec = spec;
     this.repoName = repoName;
@@ -49,7 +49,7 @@ class Coder {
   }
   
   async createFile(path, spec) {
-    await addFile(path, spec.veryMinimal, this.styleGuide, this.repoName);
+    await addFile(path, spec.minimal, this.styleGuide, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
     const lint = await executeCommand('cd ./backend && npm run lint -- .', this.repoName);
@@ -57,12 +57,37 @@ class Coder {
   }
 
   async deleteFile(path) {
+    const getGrepPatternForFilePath = (filePath) => {
+      const pathParts = filePath.split('/');
+      const fileName = pathParts[pathParts.length - 1];
+      let patterns = [`'${fileName}'\\'')'`];
+      if (fileName.endsWith('index.js')) {
+        patterns = [`'${pathParts[pathParts.length - 2]}/index.js'\\'')'`];
+        const directoryName = pathParts[pathParts.length - 2];
+        patterns.push(`'${directoryName}'\\'')'`);
+      } else {
+        if (fileName.endsWith('.js')) {
+          const fileNameWithoutExtension = fileName.substring(0, fileName.length - 3);
+          patterns.push(`'${fileNameWithoutExtension}'\\'')'`);
+        } else {
+          const indexFileName = fileName + 'index.js';
+          patterns.push(`${indexFileName}'\\'')'`);
+          const indexFileNameWithoutExtension = fileName + 'index';
+          patterns.push(`'${indexFileNameWithoutExtension}'\\'')'`);
+        }
+      } 
+      return patterns;
+    };
+    const includeResults = await executeCommand(`git ls-files | xargs grep -e ${getGrepPatternForFilePath(path).join(' -e ')}`, this.repoName);
+    if (includeResults.trim().length > 0) {
+      return `Error: File not deleted - it is included in the following files:\n\`\`\`\n${includeResults}\n\`\`\`. If you want to delete the file you must remove the references to it first.`;
+    }
     await executeCommand(`rm ${path}`, this.repoName);
     return `Deleted ${path}`;
   }
 
   async editCode(path, spec) {
-    const message = await editCode(path, spec.veryMinimal, this.styleGuide, this.repoName);
+    const message = await editCode(path, spec.minimal, this.styleGuide, this.repoName);
 
     const contents = await executeCommand(`cat ${path}`, this.repoName);
     const lint = await executeCommand('cd ./backend && npm run lint -- .', this.repoName);
@@ -205,6 +230,10 @@ class Coder {
 
 const SystemPrompt = (task, spec, packageJson) => `You are a tech lead software engineer tasked with overseeing the completion of a specific project task, guided by a detailed spec that you have previously prepared. Your role involves coordinating the efforts of your team to implement changes in a Git repository, starting from a clean slate and culminating in a new commit that encapsulates all the modifications made by your team. Your leadership and technical expertise are crucial in guiding the project to a successful completion.
 
+Be aware that the task you receive was written before the project started. It is possible that you and your team have already accomplished the task. So you should always double check the code first before issuing any instructions.
+
+When writing tests, if you encounter missing environment variables try mocking them out.
+
 To accomplish this task, you have the following tools at your disposal:
 - \`editCode(path, spec)\`: Modify existing code at the specified path, based on a focused spec.
 - \`addFile(path, spec)\`: Create a new file at the specified path, with content defined by a detailed spec.
@@ -224,6 +253,8 @@ If you determine that the task has already been completed then you should just p
 ** VERY IMPORTANT:** Do NOT make assumptions when writing specs. Do NOT assume the existence of modules, frameworks, files, or properties on objects (not even id)! You have access to the command line and should be able to verify any assumptions or questions you have (for example, use grep, cat, etc). It's important that you not be lazy issuing instructions and to not make mistakes including relying on assumptions or guesses.
 
 Do NOT include complex logging or error handling in your specs. Follow the existing logging and error handling patterns in the code, unless the task explicitly says to do otherwise. Limit the complexity of logging and error handling and do NOT introduce new frameworks for this unless explicitly asked to do so. Remember to focus on the task at hand and avoid scope creep.
+
+You are responsible for conducting code review on your team's edits. Don't judge the business aspects of the code, but make sure there are no bugs. If you see fishy looking property accesses or suspect a function's arguments or return type are not correct, then use the tools at your disposal to investigate and prompt your team to make corrective edits if necessary. DO NOT commit buggy code.
 
 Your leadership involves not only directing the technical aspects of the task but also managing the commit history to ensure it remains clean and focused solely on the task at hand. This means avoiding the temptation to include unrelated cleanup work or minor changes that are not directly relevant to the project goal.
 

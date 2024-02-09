@@ -8,7 +8,7 @@ async function resolveTasks(tasks, problemStatement, repoName) {
     // TODO: Maybe filter selectedContext w/ LLM or do some form of ranking.
     console.log('selectedContext', selectedContext);
     task.selectedContext = selectedContext; 
-    await codingTaskResolver.resolveCodingTask(task, problemStatement, repoName);
+    await codingTaskResolver.resolveTask(task, problemStatement, repoName);
   }
 }
 

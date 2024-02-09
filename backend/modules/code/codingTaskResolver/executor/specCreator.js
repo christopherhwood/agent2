@@ -2,12 +2,12 @@ const { queryLlmWithJsonCheck } = require('../../../../llmService');
 
 async function generateSpec(task, problemStatement) {
   const res = await queryLlmWithJsonCheck([{role: 'system', content: SystemPrompt}, {role: 'user', content: query(task, problemStatement)}], validateGenerateSpec);
-  return res.veryMinimal;
+  return res.minimal;
 }
 
 const validateGenerateSpec = (response) => {
-  if (!response || !response.veryMinimal) {
-    throw new Error('Response must be an object with a veryMinimal property');
+  if (!response || !response.minimal) {
+    throw new Error('Response must be an object with a minimal property');
   }
   return response;
 };

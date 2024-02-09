@@ -11,7 +11,7 @@ async function addFile(filePath, spec, styleGuide, repoName) {
   const specEmbedding = await createEmbedding(spec);
   const relevantSnippets = await selectRelatedCode(repoName, specEmbedding, [filePath]);
 
-  const edit = await queryLlmWithJsonCheck([{role: 'system', content: createAddFileSystemPrompt(styleGuide)}, {role: 'user', content: query(filePath, spec, relevantSnippets)}], validateAddFile);
+  const edit = await queryLlmWithJsonCheck([{role: 'system', content: createAddFileSystemPrompt(styleGuide)}, {role: 'user', content: query(spec, relevantSnippets, filePath)}], validateAddFile);
   if (edit.code) {
     const dir = filePath.substring(0, filePath.lastIndexOf('/'));
     if (dir.length > 0) {
