@@ -1,10 +1,9 @@
-const { genTaskDeepDive } = require('./taskDeepDiver');
+
 const ProblemTracer = require('./problemTracer');
 const { genPRD } = require('./productBrainstormer');
 const { genImplementationPlan } = require('./implementationPlanner');
 
-async function generatePlan(taskDescription, repoName, repoContext, summary) {
-  const taskDeepDive = await genTaskDeepDive(taskDescription, summary);
+async function generatePlan(taskDescription, repoName, repoContext, summary, taskDeepDive) {
   console.log('taskDeepDive:\n', taskDeepDive);
   const problemTracer = new ProblemTracer(taskDescription, taskDeepDive, summary, repoContext.directoryTree, repoName);
   const problemStatement = await problemTracer.traceProblem();

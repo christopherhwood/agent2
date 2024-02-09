@@ -78,10 +78,15 @@ router.post('/analyze-repo', async (ctx) => {
 router.post('/generate-plan', async (ctx) => {
   try {
     // taskDescription is string & summary is json object
-    const { taskDescription, gitRepoUrl, summary } = ctx.request.body;
+    const { taskDescription, gitRepoUrl, summary, taskDeepDive } = ctx.request.body;
+    if (!taskDeepDive) {
+      ctx.status = 400;
+      ctx.body = { error: '"taskDeepDive" is a required parameter' };
+      return;
+    }
     const repoName = extractRepoName(gitRepoUrl);
     const repoContext = await getRepoContext(repoName);
-    const taskTree = await generatePlan(taskDescription, repoName, repoContext, summary);
+    const taskTree = await generatePlan(taskDescription, repoName, repoContext, summary, taskDeepDive);
     ctx.status = 200;
     ctx.body = { message: 'Task list generated successfully', tasks: taskTree };
   } catch (error) {
